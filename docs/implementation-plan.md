@@ -22,13 +22,15 @@
 ```
 cagongmap/
 ├── app/
-│   ├── layout.tsx            # 루트 레이아웃, 카카오맵 SDK 스크립트 주입
-│   ├── page.tsx              # 지도 화면 (1차 구현의 유일한 화면)
+│   ├── layout.tsx            # 루트 레이아웃 (metadata, lang="ko")
+│   ├── page.tsx              # 서버 컴포넌트 — getCafes() 호출 후 MapView에 전달
 │   └── globals.css
 │
 ├── components/
 │   ├── map/
-│   │   ├── KakaoMap.tsx      # SDK 로드 대기 + 지도 인스턴스 생성/보유
+│   │   ├── MapView.tsx       # 클라이언트 진입점 — 선택 상태 보유
+│   │   ├── KakaoMap.tsx      # SDK 스크립트 로드 + 지도 인스턴스 생성
+│   │   ├── MapContext.tsx    # 생성된 지도 인스턴스를 하위로 전달
 │   │   └── CafeMarkers.tsx   # 카페 배열 → 마커 렌더링 + 클릭 핸들링
 │   └── cafe/
 │       └── CafeCard.tsx      # 마커 클릭 시 뜨는 상세 카드
@@ -45,6 +47,8 @@ cagongmap/
 │
 ├── docs/
 ├── .env.local                # NEXT_PUBLIC_KAKAO_MAP_KEY (git 제외)
+├── .env.example              # 키 없이 받은 사람을 위한 템플릿
+├── next.config.ts            # turbopack.root 고정
 └── package.json
 ```
 
@@ -134,6 +138,8 @@ export interface Cafe {
 
 `next/script`로 `autoload=false`를 붙여 로드하고, `kakao.maps.load()` 콜백 안에서 지도를 생성한다.
 
+**스크립트는 `layout.tsx`가 아니라 `KakaoMap.tsx` 안에 둔다.** `next/script`의 `onReady` 콜백으로 초기화 시점을 잡아야 하는데, 이를 위해 스크립트와 지도 생성 코드가 같은 클라이언트 컴포넌트에 있어야 하기 때문이다.
+
 ```
 //dapi.kakao.com/v2/maps/sdk.js?appkey={JS키}&autoload=false
 ```
@@ -162,7 +168,7 @@ http://localhost:3030
 
 ---
 
-## 5. 1차 구현 범위
+## 5. 1차 구현 범위 — ✅ 완료 (2026-08-12)
 
 **목표: `cafes.json`을 읽어 카카오맵 위에 마커로 띄우고, 마커를 누르면 상세 카드가 뜬다.**
 
@@ -173,6 +179,9 @@ http://localhost:3030
 | 3 | 데이터 접근 계층 | `lib/cafes.ts` |
 | 4 | SDK 로드 + 지도 렌더 (송리단길 중심) | `components/map/KakaoMap.tsx` |
 | 5 | 마커 표시 + 클릭 → 상세 카드 | `CafeMarkers.tsx`, `CafeCard.tsx` |
+
+> 구현 완료. `next build` 통과, `http://localhost:3030` 200 응답 확인.
+> **단 마커가 실제로 지도에 그려지는 것은 JS 키를 넣은 뒤에만 확인 가능하다.**
 
 ```json
 "scripts": {
