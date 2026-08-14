@@ -49,6 +49,26 @@ begin
 exception when check_violation then raise notice 'OK: lat 범위가 막았다';
 end $$;
 
+\echo '=== 5-1. photos는 https URL 목록만 받는다 ==='
+do $$
+begin
+  insert into public.places (name, address, lat, lng, is_24h, open_time, close_time, photos)
+  values ('사진형식', '서울 송파구 어딘가 5-1', 37.51, 127.10, false, '09:00', '18:00',
+          array['not-a-url']);
+  raise exception 'FAIL: photos 형식이 통과되어 버렸다';
+exception when check_violation then raise notice 'OK: places_photos_https가 막았다';
+end $$;
+do $$
+declare
+  v_photos text[];
+begin
+  insert into public.places (name, address, lat, lng, is_24h, open_time, close_time, photos)
+  values ('사진정상', '서울 송파구 어딘가 5-2', 37.51, 127.10, false, '09:00', '18:00',
+          array['https://example.com/a.jpg', 'https://example.com/b.jpg'])
+  returning photos into v_photos;
+  raise notice 'OK: 여러 장 저장됨 (%장)', cardinality(v_photos);
+end $$;
+
 \echo '=== 6. naver_place_url 중복 등록 방지 ==='
 do $$
 begin

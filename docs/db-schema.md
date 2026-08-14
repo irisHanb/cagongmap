@@ -10,6 +10,7 @@
 | `supabase/migrations/20260814000001_places.sql` | enum, `places`, 인덱스, 공개 조회 RLS |
 | `supabase/migrations/20260814000002_profiles_and_submissions.sql` | `profiles`, `place_submissions`, 승인/반려 함수, RLS |
 | `supabase/migrations/20260814000003_seed_places.sql` | 카페 9곳 (`scripts/generate-seed.mjs`로 `data/cafes.json`에서 생성) |
+| `supabase/migrations/20260814000004_places_photos.sql` | `places.photos` 추가 |
 | `supabase/tests/` | 검증 스크립트 (auth 스텁 + 제약·RLS·제보 흐름 검사) |
 | `scripts/verify-schema.sh` | 위 전부를 일회용 Postgres 컨테이너에서 실행 |
 
@@ -64,10 +65,26 @@ export async function getCafes(): Promise<Cafe[]> {
 | `outlet` `noise` `work_fit` | enum | `types/cafe.ts`와 1:1 |
 | `wifi` | `boolean` | |
 | `work_policy` | enum, null | **보류 중인 결정.** 아래 참고 |
+| `photos` | `text[]`, not null, 기본 `'{}'` | 사진 **URL** 목록. 파일은 저장하지 않는다. 아래 참고 |
 | `tags` | `text[]` + GIN | 정규화(태그 테이블)는 현 규모에 과함 |
 | `status` | enum `draft/published/hidden/closed` | 익명에게는 `published`만 보인다 |
 | `last_verified` `verified_by` | `date` / `uuid` | 신선도 노출 (mvp-decisions 2-3) |
 | `created_by` `created_at` `updated_at` | | `updated_at`은 트리거 |
+
+### `photos` — 저작권 결정을 다시 연 컬럼
+
+`mvp-decisions.md` 3절은 **"사진은 넣지 않는다 (저작권)"** 를 결정으로 두고 상세를
+`naver_place_url`로 넘겼다. `photos`는 그 결정을 다시 연 것이다. 컬럼이 생겼다고
+결정이 뒤집힌 것은 아니며, **화면에 띄우기 전에 출처와 이용 조건을 정해야 한다.**
+
+채울 때 지켜야 하는 것:
+
+- 카카오맵 API 응답에서 온 URL을 넣지 않는다. 응답 데이터의 별도 저장은 약관 위반이고
+  차단이 실제로 집행된다 (`mvp-decisions.md` 크롤링 금지).
+- `places_photos_https` check가 `https://` 로 시작하는 URL 목록만 받는다. URL에
+  인코딩되지 않은 공백이 올 수 없다는 점을 이용해 배열을 한 줄로 이어 붙여 검사한다.
+
+앱은 아직 이 컬럼을 읽지 않는다. `lib/cafes.ts`의 `COLUMNS`에 없다.
 
 ### 판단이 갈렸던 지점
 
