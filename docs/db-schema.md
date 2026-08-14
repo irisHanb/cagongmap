@@ -11,6 +11,7 @@
 | `supabase/migrations/20260814000002_profiles_and_submissions.sql` | `profiles`, `place_submissions`, 승인/반려 함수, RLS |
 | `supabase/migrations/20260814000003_seed_places.sql` | 카페 9곳 (`scripts/generate-seed.mjs`로 `data/cafes.json`에서 생성) |
 | `supabase/migrations/20260814000004_places_photos.sql` | `places.photos` 추가 |
+| `supabase/migrations/20260814100834_place_photos_from_storage.sql` | `place-images` 버킷 사진 9장을 `photos`에 연결 |
 | `supabase/tests/` | 검증 스크립트 (auth 스텁 + 제약·RLS·제보 흐름 검사) |
 | `scripts/verify-schema.sh` | 위 전부를 일회용 Postgres 컨테이너에서 실행 |
 
