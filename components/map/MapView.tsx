@@ -2,8 +2,8 @@
 
 import { useCallback, useState } from 'react';
 import type { Cafe } from '@/types/cafe';
-import CafeCard from '@/components/cafe/CafeCard';
 import CafeMarkers from './CafeMarkers';
+import CafeOverlay from './CafeOverlay';
 import KakaoMap from './KakaoMap';
 
 /** 송리단길 일대 — 송파·잠실 권역 기준점 (docs/scope.md) */
@@ -26,9 +26,9 @@ export default function MapView({ cafes }: { cafes: Cafe[] }) {
 
       <KakaoMap center={INITIAL_CENTER} level={5}>
         <CafeMarkers cafes={cafes} onSelect={handleSelect} />
+        {/* 카드는 마커 위에 붙는다 — 지도 좌표가 필요하므로 KakaoMap 안에 있어야 한다 */}
+        <CafeOverlay cafe={selected} onClose={handleClose} />
       </KakaoMap>
-
-      {selected && <CafeCard cafe={selected} onClose={handleClose} />}
     </main>
   );
 }

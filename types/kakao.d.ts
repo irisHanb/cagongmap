@@ -35,6 +35,22 @@ declare namespace kakao.maps {
     setMap(map: Map | null): void;
   }
 
+  interface CustomOverlayOptions {
+    map?: Map;
+    position: LatLng;
+    content: HTMLElement | string;
+    xAnchor?: number;
+    yAnchor?: number;
+    zIndex?: number;
+    clickable?: boolean;
+  }
+
+  class CustomOverlay {
+    constructor(options: CustomOverlayOptions);
+    setMap(map: Map | null): void;
+    setPosition(position: LatLng): void;
+  }
+
   namespace event {
     function addListener(target: object, type: string, handler: () => void): void;
     function removeListener(target: object, type: string, handler: () => void): void;

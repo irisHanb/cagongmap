@@ -102,29 +102,54 @@ a {
   font-family: monospace;
 }
 
-/* 상세 카드 — 모바일 웹 우선이라 하단 시트 형태 */
-.cafe-card {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 3;
-  max-height: 65dvh;
-  overflow-y: auto;
-  padding: 20px 16px 24px;
-  border-radius: 16px 16px 0 0;
-  background: var(--background);
-  box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.18);
+/* 상세 카드 — 마커 위에 뜨는 말풍선.
+   CustomOverlay가 만드는 .cafe-overlay 안에 들어가므로 위치는 SDK가 잡는다. */
+.cafe-overlay {
+  position: relative;
+  /* 좌표에 맞춰진 좌상단을 기준으로 가로 중앙·세로 위쪽으로 옮긴다.
+     이 한 줄이 "마커 위 중앙"을 만든다 (CafeOverlay의 xAnchor·yAnchor 주석 참고). */
+  transform: translate(-50%, -100%);
+  /* 마커 높이(42px)만큼 띄워 카드가 마커를 가리지 않게 한다 */
+  padding-bottom: 52px;
 }
 
-@media (min-width: 768px) {
-  .cafe-card {
-    left: auto;
-    right: 16px;
-    bottom: 16px;
-    width: 340px;
-    border-radius: 12px;
-  }
+/* 꼬리 — 카드를 좌우로 밀어도 여기 남아 마커를 계속 가리킨다 */
+.cafe-overlay::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 44px;
+  transform: translateX(-50%);
+  border-style: solid;
+  border-width: 8px 8px 0 8px;
+  border-color: var(--background) transparent transparent transparent;
+}
+
+/* 위쪽에 자리가 없을 때 — 마커 아래로 뒤집는다 */
+.cafe-overlay--below {
+  transform: translate(-50%, 0);
+  padding-bottom: 0;
+  padding-top: 12px;
+}
+
+.cafe-overlay--below::after {
+  bottom: auto;
+  top: 4px;
+  border-width: 0 8px 8px 8px;
+  border-color: transparent transparent var(--background) transparent;
+}
+
+.cafe-card {
+  position: relative;
+  /* 지도 가장자리에서 잘리지 않게 CafeOverlay가 밀어 넣는 양 */
+  transform: translateX(var(--shift-x, 0px));
+  width: min(320px, calc(100vw - 32px));
+  max-height: 60dvh;
+  overflow-y: auto;
+  padding: 20px 16px;
+  border-radius: 12px;
+  background: var(--background);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22);
 }
 
 .cafe-card__close {
