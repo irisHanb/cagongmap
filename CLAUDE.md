@@ -58,7 +58,10 @@ Supabase 쪽은 폴백을 두지 않았다. 원본이 하나여야 하는데 조
 - **`autoload=false`로 로드하고 `kakao.maps.load()` 콜백 안에서 지도를 만든다.** 자동 로드에 맡기면 하이드레이션 시점과 어긋나 `kakao is not defined`가 산발적으로 발생한다.
 - **`next/script`는 `layout.tsx`가 아니라 `KakaoMap.tsx` 안에 있다.** `onReady`로 초기화 시점을 잡아야 해서 스크립트와 지도 생성 코드가 같은 클라이언트 컴포넌트에 있어야 한다.
 - **`MapContext`**가 생성된 지도 인스턴스를 하위로 전달한다. `KakaoMap`이 자식을 알지 않아도 되게 하려는 것이다.
-- **`CafeMarkers`는 DOM을 렌더링하지 않고 `null`을 반환한다.** 마커 생성·해제를 `useEffect` 안에 가두고, cleanup에서 `setMap(null)`을 반드시 호출한다. 빠뜨리면 유령 마커가 남는다.
+- **마커는 기본 `Marker`가 아니라 `CustomOverlay` + `createPortal`이다** (`CafeMarker`). 대표 사진을 원형으로 자르고 테두리를 두르려면 HTML이어야 한다. `MarkerImage`는 이미지를 아이콘에 그대로 얹을 뿐이라 크롭이 안 된다. 어느 쪽이든 cleanup에서 `setMap(null)`을 반드시 호출한다. 빠뜨리면 유령 마커가 남는다.
+- **마커의 포탈 컨테이너는 `useEffect`에서 만든다.** 게으른 초기화로 만들면 서버는 `null`, 클라이언트는 포탈을 내놓아 하이드레이션이 깨진다. 마커는 항상 렌더되므로 이 차이가 매번 드러난다.
+- **선택된 마커를 위로 올릴 때는 `overlay.setZIndex()`를 쓴다.** 오버레이마다 SDK가 별도 wrapper를 만들기 때문에 CSS `z-index`로는 형제 마커를 넘지 못한다.
+- **`KakaoMap`은 `ResizeObserver`로 스스로 `relayout()`한다.** 상세 패널이 열리면 데스크톱에서 지도 폭이 줄어드는데, 알려주지 않으면 타일이 잘린 채 남는다. 패널 상태를 `KakaoMap`까지 내려보내지 않으려고 크기를 직접 본다.
 - **`onSelect`는 `useCallback`으로 참조를 고정한다** (`MapView`). 안 하면 렌더마다 마커를 전부 지웠다 다시 만든다.
 - `types/kakao.d.ts`는 **직접 작성한 최소 선언**이다. 공식 타입 패키지가 없으므로, 새 SDK API를 쓰면 여기에 먼저 추가해야 한다.
 

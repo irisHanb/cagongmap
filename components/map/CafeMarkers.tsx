@@ -1,42 +1,33 @@
 'use client';
 
-import { useEffect } from 'react';
 import type { Cafe } from '@/types/cafe';
-import { useKakaoMap } from './MapContext';
+import CafeMarker from './CafeMarker';
 
 interface CafeMarkersProps {
   cafes: Cafe[];
+  /** 지금 열려 있는 카페의 id. 그 마커만 강조하고 위로 올린다 */
+  selectedId: string | null;
   onSelect: (cafe: Cafe) => void;
 }
 
 /**
  * 카페 배열을 마커로 그린다.
  *
- * 카카오 SDK는 명령형이라 React의 선언형 렌더링 밖에 있다. 그래서 마커 생성·해제를
- * 이 컴포넌트의 useEffect 안에 가두고, DOM은 아무것도 렌더링하지 않는다.
+ * 마커 하나하나가 CustomOverlay + 포탈을 각자 들고 있어야 해서(CafeMarker 주석),
+ * 여기서는 목록을 펼치기만 한다. DOM은 이 컴포넌트가 아니라 각 오버레이가 만든
+ * 컨테이너에 들어간다.
  */
-export default function CafeMarkers({ cafes, onSelect }: CafeMarkersProps) {
-  const map = useKakaoMap();
-
-  useEffect(() => {
-    if (!map) return;
-
-    const markers = cafes.map((cafe) => {
-      const marker = new window.kakao.maps.Marker({
-        map,
-        position: new window.kakao.maps.LatLng(cafe.lat, cafe.lng),
-        title: cafe.name,
-      });
-
-      window.kakao.maps.event.addListener(marker, 'click', () => onSelect(cafe));
-      return marker;
-    });
-
-    // 언마운트·데이터 변경 시 이전 마커를 반드시 지운다. 빠뜨리면 지도에 유령 마커가 남는다.
-    return () => {
-      markers.forEach((marker) => marker.setMap(null));
-    };
-  }, [map, cafes, onSelect]);
-
-  return null;
+export default function CafeMarkers({ cafes, selectedId, onSelect }: CafeMarkersProps) {
+  return (
+    <>
+      {cafes.map((cafe) => (
+        <CafeMarker
+          key={cafe.id}
+          cafe={cafe}
+          selected={cafe.id === selectedId}
+          onSelect={onSelect}
+        />
+      ))}
+    </>
+  );
 }

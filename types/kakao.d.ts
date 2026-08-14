@@ -49,6 +49,7 @@ declare namespace kakao.maps {
     constructor(options: CustomOverlayOptions);
     setMap(map: Map | null): void;
     setPosition(position: LatLng): void;
+    setZIndex(zIndex: number): void;
   }
 
   namespace event {

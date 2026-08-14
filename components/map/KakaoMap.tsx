@@ -43,6 +43,19 @@ export default function KakaoMap({ center, level = 5, children }: KakaoMapProps)
     }
   }, [map, initMap]);
 
+  // 상세 패널이 열리면 데스크톱에서 지도 폭이 줄어든다. 카카오맵은 컨테이너 크기를
+  // 스스로 감시하지 않아서, 알려주지 않으면 타일이 잘린 채로 남는다.
+  // 패널 상태를 여기까지 내려보내는 대신 컨테이너 크기를 직접 본다 — KakaoMap이
+  // 자식이 무엇을 하는지 몰라도 되게 하려는 것이다.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!map || !container) return;
+
+    const observer = new ResizeObserver(() => map.relayout());
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [map]);
+
   if (!process.env.NEXT_PUBLIC_KAKAO_MAP_KEY) {
     return (
       <div className="map-error">

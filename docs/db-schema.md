@@ -89,7 +89,9 @@ export async function getCafes(): Promise<Cafe[]> {
 - `places_photos_https` check가 `https://` 로 시작하는 URL 목록만 받는다. URL에
   인코딩되지 않은 공백이 올 수 없다는 점을 이용해 배열을 한 줄로 이어 붙여 검사한다.
 
-앱은 아직 이 컬럼을 읽지 않는다. `lib/cafes.ts`의 `COLUMNS`에 없다.
+앱은 `COLUMNS`로 이 컬럼을 읽는다. 첫 장이 마커 썸네일, 전체가 상세 패널의 슬라이드다.
+`next.config.ts`의 `images.remotePatterns`가 이 버킷 호스트를 열어준다 — 없으면
+`next/image`가 400으로 막는다.
 
 ### 판단이 갈렸던 지점
 

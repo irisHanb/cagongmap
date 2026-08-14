@@ -22,6 +22,8 @@ export interface Cafe {
   wifi: boolean;
   noise: NoiseLevel;
   work_fit: WorkFit;
+  /** 사진 URL 목록. 없는 카페는 빈 배열 — 화면은 빈 상태로 처리한다 */
+  photos: string[];
   tags: string[];
   /** "YYYY-MM-DD" — 신선도 표시용 */
   last_verified: string;

@@ -22,7 +22,7 @@ import type { Cafe, NoiseLevel, OutletLevel, WorkFit } from '@/types/cafe';
  * 추론하지 못하고 GenericStringError로 떨어진다.
  */
 const COLUMNS =
-  'id, slug, name, address, lat, lng, naver_place_url, open_time, close_time, is_24h, iced_americano_price, outlet, wifi, noise, work_fit, tags, last_verified';
+  'id, slug, name, address, lat, lng, naver_place_url, open_time, close_time, is_24h, iced_americano_price, outlet, wifi, noise, work_fit, photos, tags, last_verified';
 
 /**
  * published 행만 조회하므로 outlet·wifi·noise·work_fit·last_verified는 반드시 채워져
@@ -44,6 +44,7 @@ interface PlaceRow {
   wifi: boolean;
   noise: NoiseLevel;
   work_fit: WorkFit;
+  photos: string[];
   tags: string[];
   last_verified: string;
 }
@@ -67,6 +68,8 @@ function toCafe(row: PlaceRow): Cafe {
     wifi: row.wifi,
     noise: row.noise,
     work_fit: row.work_fit,
+    // not null + default '{}'이라 null로 올 일이 없다 (20260814000004_places_photos.sql)
+    photos: row.photos,
     tags: row.tags,
     last_verified: row.last_verified,
   };
