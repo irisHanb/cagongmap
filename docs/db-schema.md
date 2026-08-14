@@ -74,9 +74,13 @@ export async function getCafes(): Promise<Cafe[]> {
 
 ### `photos` — 저작권 결정을 다시 연 컬럼
 
-`mvp-decisions.md` 3절은 **"사진은 넣지 않는다 (저작권)"** 를 결정으로 두고 상세를
-`naver_place_url`로 넘겼다. `photos`는 그 결정을 다시 연 것이다. 컬럼이 생겼다고
-결정이 뒤집힌 것은 아니며, **화면에 띄우기 전에 출처와 이용 조건을 정해야 한다.**
+`mvp-decisions.md` 3절은 원래 **"사진은 넣지 않는다 (저작권)"** 를 결정으로 두고 상세를
+`naver_place_url`로 넘겼다. 2026-08-14에 그 결정을 뒤집고, Supabase Storage
+`place-images` 버킷(public)에 직접 호스팅하기로 했다. 값은
+`20260814100834_place_photos_from_storage.sql`이 파일명을 slug에 맞춰 채웠다.
+
+⚠️ **지금 들어 있는 9장은 연습용 임시 이미지이며 이용 권리를 확인하지 않았다.**
+습작 범위를 넘겨 공개하려면 교체해야 한다.
 
 채울 때 지켜야 하는 것:
 

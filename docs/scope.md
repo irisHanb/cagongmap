@@ -30,7 +30,8 @@
    - 콘센트(`outlet`) · 와이파이(`wifi`) · 소음(`noise`) · 지금 영업중 · 가격대(`iced_americano_price`)
    - ⚠️ 당초 3대 핵심 필터 중 하나였던 **카공 허용은 보류**되었다. 아래 "보류된 차별점" 참고.
 3. **카페 상세 카드** — 핀 클릭 시 핵심 속성 + 영업시간 + 네이버 플레이스 링크 + "최근 확인됨"(`last_verified`) 표시.
-   - 사진은 저작권 문제로 넣지 않고 네이버 플레이스로 넘긴다 (`mvp-decisions.md` 3절).
+   - 사진은 직접 호스팅한다 — 마커에 대표 사진, 상세에 좌우 슬라이드 (`mvp-decisions.md` 3절).
+     ⚠️ 현재 이미지는 연습용 임시본이라 공개 전 교체가 필요하다.
 4. **필터링 / 정렬** — 속성으로 핀을 거르고, 리스트 뷰로도 열람.
 5. **운영자 시드 데이터 입력 구조** — 정적 `data/cafes.json` 직접 편집. 관리 화면은 만들지 않는다.
 
@@ -68,7 +69,7 @@
 | `work_fit` | enum (`good`/`ok`/`bad`) | 종합 작업 적합도 |
 | `open_time` / `close_time` / `is_24h` | string / boolean | 심야·24h 및 "지금 영업중" 판정 |
 | `iced_americano_price` | number | 가격대 필터 |
-| `naver_place_url` | string | 사진·상세는 여기로 위임 |
+| `naver_place_url` | string | 메뉴·리뷰 등 나머지 상세는 여기로 위임 |
 | `tags` | string[] | 자유 태그 |
 | `last_verified` | date | **추가 예정** — 신선도 표시 (`mvp-decisions.md` 2-3) |
 
