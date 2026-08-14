@@ -9,13 +9,15 @@ export interface Cafe {
   address: string;
   lat: number;
   lng: number;
-  naver_place_url: string;
+  /** DB에서 nullable — 아직 링크를 못 찾은 카페가 있을 수 있다 */
+  naver_place_url: string | null;
   /** "HH:mm" */
   open_time: string;
   /** "HH:mm" — "00:00"은 자정 마감 */
   close_time: string;
   is_24h: boolean;
-  iced_americano_price: number;
+  /** DB에서 nullable — 가격을 확인하지 못한 카페는 null */
+  iced_americano_price: number | null;
   outlet: OutletLevel;
   wifi: boolean;
   noise: NoiseLevel;

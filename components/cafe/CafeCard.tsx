@@ -47,7 +47,11 @@ export default function CafeCard({ cafe, onClose }: CafeCardProps) {
         </div>
         <div>
           <dt>아이스 아메리카노</dt>
-          <dd>{cafe.iced_americano_price.toLocaleString()}원</dd>
+          <dd>
+            {cafe.iced_americano_price === null
+              ? '확인 안 됨'
+              : `${cafe.iced_americano_price.toLocaleString()}원`}
+          </dd>
         </div>
       </dl>
 
@@ -59,14 +63,16 @@ export default function CafeCard({ cafe, onClose }: CafeCardProps) {
         </ul>
       )}
 
-      <a
-        className="cafe-card__link"
-        href={cafe.naver_place_url}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        네이버 플레이스에서 보기 →
-      </a>
+      {cafe.naver_place_url && (
+        <a
+          className="cafe-card__link"
+          href={cafe.naver_place_url}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          네이버 플레이스에서 보기 →
+        </a>
+      )}
 
       {/* 데이터 신선도를 숨기지 않고 드러낸다 (docs/mvp-decisions.md 2-3) */}
       <p className="cafe-card__verified">{cafe.last_verified} 확인</p>

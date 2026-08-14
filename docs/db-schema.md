@@ -33,6 +33,11 @@ export async function getCafes(): Promise<Cafe[]> {
 ```
 
 컴포넌트는 그대로 두고 이 파일만 바꾸는 것이 애초에 이 구조를 열어둔 이유다 (CLAUDE.md).
+**실제로 그렇게 했다** — 전환하면서 `components/`에서 바꾼 것은 `iced_americano_price`·
+`naver_place_url`이 DB에서 nullable이라 `CafeCard`에 null 처리를 넣은 것뿐이다.
+
+앱의 키는 `slug`다. `toCafe()`가 `slug`를 `Cafe.id`로 옮기고, slug가 없는 행(제보로
+등록되어 아직 큐레이터가 slug를 붙이지 않은 경우)만 uuid로 버틴다.
 
 **테이블 이름은 `places`, 앱 쪽은 여전히 `cafes`다.** 지금 담기는 것은 카페뿐이지만
 스터디카페·도서관까지 넓힐 때 테이블을 다시 만들지 않으려고 일반적인 이름을 썼다.
@@ -161,5 +166,5 @@ supabase db push          # 마이그레이션 3개 — 스키마 2개 + 카페 
 
 ## 남은 것
 
-- `data/cafes.json`과 DB 중 무엇이 원본인지 — 전환 시점에 하나로 정해야 한다. 현재 초안은 JSON을 원본으로 두고 시드 마이그레이션을 생성하는 방향이다. 이미 적용한 뒤 JSON을 고치면 새 마이그레이션을 따로 만들어야 한다.
+- ~~`data/cafes.json`과 DB 중 무엇이 원본인지~~ — **정해졌다. 런타임 원본은 DB다.** JSON은 시드 마이그레이션을 만드는 입력으로만 남는다. 이미 적용한 뒤 JSON을 고치면 새 마이그레이션을 따로 만들어야 한다.
 - 즐겨찾기(`favorites`)는 scope.md대로 로컬스토리지로 두고 테이블을 만들지 않았다.

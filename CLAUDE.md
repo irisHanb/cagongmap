@@ -25,7 +25,15 @@ npm start        # 프로덕션 실행 — 포트 3030 고정
 
 ## 환경변수
 
-`.env.local`의 `NEXT_PUBLIC_KAKAO_MAP_KEY`(카카오 JavaScript 키) 하나뿐이다. 키가 없으면 지도 대신 안내 문구가 렌더된다 — 이는 의도된 폴백이다.
+`.env.local`에 셋이 필요하다.
+
+| 변수 | 없으면 |
+|---|---|
+| `NEXT_PUBLIC_KAKAO_MAP_KEY` | 지도 대신 안내 문구가 렌더된다 — 의도된 폴백이다 |
+| `NEXT_PUBLIC_SUPABASE_URL` | `lib/supabase.ts`가 즉시 throw한다 |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 위와 같다 |
+
+Supabase 쪽은 폴백을 두지 않았다. 원본이 하나여야 하는데 조용히 JSON으로 되돌아가면 화면이 실제 DB와 다른 것을 보여주기 때문이다.
 
 `NEXT_PUBLIC_` 접두사이므로 값을 바꾸면 **개발 서버를 재시작해야** 반영된다.
 
@@ -35,9 +43,13 @@ npm start        # 프로덕션 실행 — 포트 3030 고정
 
 ### `lib/cafes.ts` — 데이터 이음매 (이 구조의 핵심)
 
-**컴포넌트는 `data/cafes.json`을 직접 import하지 않는다.** 모든 데이터 접근은 `getCafes()` / `getCafeById()`를 통한다.
+**컴포넌트는 카페 데이터를 직접 가져오지 않는다.** 모든 데이터 접근은 `getCafes()` / `getCafeById()`를 통한다.
 
-로그인·제보(UGC)는 최종 목표에 포함되지만 1차 범위에서 제외됐고, 도입 시 이 파일의 함수 본문만 `fetch('/api/cafes')`로 교체하면 컴포넌트를 건드릴 필요가 없도록 설계됐다. **이 규칙을 깨면 구조를 열어둔 의미가 사라진다.**
+원본은 이제 Supabase `places` 테이블이다(`lib/supabase.ts` 경유). JSON에서 DB로 갈아탈 때 컴포넌트는 한 줄도 바뀌지 않았다 — 이 이음매를 열어둔 이유가 그것이다. **이 규칙을 깨면 의미가 사라진다.**
+
+- 앱의 키는 `places.slug`다(`naruteo`). `places.id`(uuid)가 아니다 — `toCafe()`가 `slug`를 `Cafe.id`로 옮긴다.
+- `select('*')`를 쓰지 않는다. `COLUMNS` 상수는 **한 줄 리터럴이어야** supabase-js가 결과 타입을 추론한다.
+- `app/page.tsx`의 `export const revalidate = 300`이 캐싱을 정한다.
 
 ### 카카오맵 SDK 통합
 
@@ -56,7 +68,12 @@ npm start        # 프로덕션 실행 — 포트 3030 고정
 
 ## 데이터
 
-`data/cafes.json`이 유일한 원본이다. 현재 9곳(송파·잠실 7 + 강남 2).
+런타임 원본은 Supabase `places` 테이블이다. `data/cafes.json`은 시드 마이그레이션
+(`supabase/migrations/20260814000003_seed_places.sql`)을 만드는 입력으로만 남아 있다 —
+`node scripts/generate-seed.mjs`로 재생성한다. 현재 9곳(송파·잠실 7 + 강남 2).
+
+**이미 적용한 뒤 JSON을 고쳐도 DB에 반영되지 않는다.** 마이그레이션은 한 번만 돌기 때문에,
+그때는 새 마이그레이션을 따로 만들거나 Supabase에서 직접 고쳐야 한다.
 
 - **`id`가 키다.** 이름은 바뀌므로 `name`을 키로 쓰지 않는다.
 - `last_verified`는 화면에 "확인일"로 노출된다. **현재 값은 전부 임시로 채운 오늘 날짜이며 실제 확인 시점이 아니다.**
