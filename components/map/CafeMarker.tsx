@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import type { Cafe } from '@/types/cafe';
+import { WORK_FIT_LABEL } from '@/types/cafe';
 import { useKakaoMap } from './MapContext';
 
 /** useSyncExternalStore용 — 값이 바뀌지 않으므로 구독할 것이 없다 */
@@ -21,6 +22,9 @@ interface CafeMarkerProps {
  * SDK 기본 Marker 대신 CustomOverlay를 쓴다. 기본 Marker는 MarkerImage로 이미지
  * URL을 아이콘에 그대로 얹기만 해서 원형 크롭도 테두리도 안 된다. HTML로 그리면
  * 사진을 동그랗게 자르고 선택 상태도 CSS로 표현할 수 있다.
+ *
+ * 테두리 색은 work_fit에서 온다 (DESIGN.md — Map Marker). 색만으로 뜻을 전달하면
+ * 안 되므로 같은 값을 title·aria-label에도 글로 넣는다.
  *
  * 오버레이가 만든 DOM 안에 createPortal로 React를 꽂아, 마커 내용은 계속 React가
  * 그린다. next/image를 그대로 쓸 수 있는 것도 이 때문이다 — 원본이 4MB대라
@@ -79,14 +83,17 @@ export default function CafeMarker({ cafe, selected, onSelect }: CafeMarkerProps
   if (!node || !hydrated) return null;
 
   const photo = cafe.photos[0];
+  const workFit = WORK_FIT_LABEL[cafe.work_fit];
 
   return createPortal(
     <button
       type="button"
-      className={`cafe-marker${selected ? ' cafe-marker--selected' : ''}`}
+      className={`cafe-marker cafe-marker--${cafe.work_fit}${
+        selected ? ' cafe-marker--selected' : ''
+      }`}
       onClick={() => onSelect(cafe)}
-      title={cafe.name}
-      aria-label={`${cafe.name} 상세 보기`}
+      title={`${cafe.name} · ${workFit}`}
+      aria-label={`${cafe.name}, ${workFit} — 상세 보기`}
     >
       {photo ? (
         <Image

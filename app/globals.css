@@ -1,14 +1,61 @@
+/* ---------------------------------------------------------------
+   토큰 — DESIGN.md frontmatter를 그대로 옮긴다.
+   여기 없는 색·여백·모서리를 컴포넌트에서 새로 만들지 않는다.
+   --------------------------------------------------------------- */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --surface: #fffaf8;
+  --surface-dim: #e4dad6;
+  --surface-bright: #fffdfb;
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #f9f2ef;
+  --surface-container: #f3eae7;
+  --surface-container-high: #ece0dd;
+  --surface-container-highest: #e4d7d3;
+  --on-surface: #211b1a;
+  --on-surface-variant: #5b504d;
+  --outline: #92817d;
+  --outline-variant: #e2d5d1;
+  --primary: #88484a;
+  --on-primary: #ffffff;
+  --primary-container: #e8c5c2;
+  --on-primary-container: #683638;
+  --secondary: #606851;
+  --secondary-container: #dce4cc;
+  --tertiary: #2f6f67;
+  --tertiary-container: #b9dcd5;
+  --pastel-mint: #d8f1ec;
+  --positive-text: #214f49;
+  --warm-cream: #fffef9;
+  --naver: #03c75a;
+
+  /* work_fit — 마커 테두리 전용. 좋음만 색을 갖고 나머지는 무채색으로 눕힌다 */
+  --work-fit-good: var(--tertiary);
+  --work-fit-ok: var(--outline-variant);
+  --work-fit-bad: var(--outline);
+
+  --sp-xs: 4px;
+  --sp-sm: 8px;
+  --sp-md: 16px;
+  --sp-lg: 24px;
+  --sp-xl: 32px;
+
+  --r-sm: 8px;
+  --r-md: 16px;
+  --r-lg: 24px;
+  --r-panel: 28px;
+  --r-full: 9999px;
+
+  --shadow-brew: 0 18px 42px -24px rgba(50, 37, 34, 0.34);
+  --shadow-marker: 0 10px 20px -13px rgba(35, 25, 25, 0.5);
+  --shadow-marker-selected: 0 0 0 7px rgba(136, 72, 74, 0.2),
+    0 15px 28px -14px rgba(35, 25, 25, 0.62);
+
+  --font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
+    system-ui, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* 다크 모드는 두지 않는다 — DESIGN.md가 따뜻한 라이트 팔레트 하나만 정의한다. */
 
 html {
   height: 100%;
@@ -22,11 +69,12 @@ body {
 
 body {
   min-height: 100%;
-  display: flex;
-  flex-direction: column;
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--on-surface);
+  background: var(--surface);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -42,115 +90,132 @@ a {
   text-decoration: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 /* ---------------------------------------------------------------
-   카공맵
+   지도 셸 — 지도는 100dvh 풀스크린이고, 나머지 UI는 전부 그 위에 뜬다
    --------------------------------------------------------------- */
 
 .map-view {
   position: relative;
-  display: flex;
-  flex-direction: column;
   height: 100dvh;
-}
-
-.map-view__header {
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(128, 128, 128, 0.25);
-  background: var(--background);
-  z-index: 2;
-}
-
-.map-view__header h1 {
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.map-view__header p {
-  margin-top: 2px;
-  font-size: 13px;
-  opacity: 0.6;
-}
-
-/* 데스크톱에서는 지도와 상세 패널이 가로로 나뉘고, 모바일에서는 패널이
-   지도 위로 올라온다(.cafe-panel이 absolute). 그래서 여기가 기준 박스다. */
-.map-view__body {
-  position: relative;
-  flex: 1;
-  display: flex;
-  min-height: 0;
+  overflow: hidden;
 }
 
 .map-container {
-  flex: 1;
-  /* 패널이 열리면 이 폭이 줄어든다. min-width가 없으면 지도가 안 줄고 패널이 밀린다 */
-  min-width: 0;
-  height: 100%;
+  position: absolute;
+  inset: 0;
 }
 
 .map-error {
-  flex: 1;
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--sp-sm);
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: var(--sp-lg);
   text-align: center;
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 20px;
+  color: var(--on-surface-variant);
 }
 
 .map-error code {
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: rgba(128, 128, 128, 0.18);
-  font-family: monospace;
+  padding: 2px 6px;
+  border-radius: var(--r-sm);
+  background: var(--surface-container);
+  color: var(--on-primary-container);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 /* ---------------------------------------------------------------
-   마커 — CustomOverlay에 얹는 HTML 핀 (components/map/CafeMarker.tsx)
+   브랜드 dock — 지도 탐색을 시작하는 작은 표면.
+   검색바·로그인·북마크 자리는 아직 비어 있다 (DESIGN.md "현재 구현 범위" 참고)
    --------------------------------------------------------------- */
 
-/* 오버레이는 좌상단만 좌표에 맞춰 놓는다. "마커 끝이 좌표를 가리키는" 모양은
-   이 transform이 만든다. 아래 padding은 꼬리가 설 자리다. */
-.cafe-marker-anchor {
-  position: relative;
-  transform: translate(-50%, -100%);
-  padding-bottom: 9px;
+.brand-dock {
+  position: absolute;
+  top: var(--sp-md);
+  left: var(--sp-md);
+  z-index: 2;
+  width: 390px;
+  max-width: calc(100vw - var(--sp-xl));
+  padding: 20px;
+  border-radius: var(--r-panel);
+  background: color-mix(in srgb, var(--surface) 95%, transparent);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-brew);
 }
 
-.cafe-marker-anchor::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  transform: translateX(-50%);
-  border-style: solid;
-  border-width: 9px 6px 0 6px;
-  border-color: #ffffff transparent transparent transparent;
-  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.25));
+.eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+  letter-spacing: 0.12em;
+  color: var(--primary);
+}
+
+.brand-dock h1 {
+  margin-top: var(--sp-xs);
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 36px;
+}
+
+.brand-dock__sub {
+  margin-top: var(--sp-xs);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+  color: var(--on-surface-variant);
+}
+
+/* 상세가 열리면 xl 미만에서 dock을 숨긴다 — 지도와 상세가 부딪히지 않게 */
+@media (max-width: 1279px) {
+  .map-view--detail .brand-dock {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------
+   마커 — 46px 원형 썸네일. 테두리 색은 work_fit에서 온다
+   --------------------------------------------------------------- */
+
+.cafe-marker-anchor {
+  position: relative;
+  transform: translate(-50%, -50%);
 }
 
 .cafe-marker {
-  position: relative;
   display: block;
-  width: 48px;
-  height: 48px;
+  width: 46px;
+  height: 46px;
   padding: 0;
-  border: 2px solid #ffffff;
-  border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  border: 2px solid var(--marker-border, var(--outline-variant));
+  border-radius: var(--r-full);
+  background: var(--warm-cream);
+  box-shadow: var(--shadow-marker);
   overflow: hidden;
   cursor: pointer;
-  transform-origin: 50% 100%;
-  transition: transform 0.12s ease-out, border-color 0.12s ease-out;
+  transition: transform 0.14s ease-out, border-color 0.14s ease-out,
+    box-shadow 0.14s ease-out;
+}
+
+.cafe-marker--good {
+  --marker-border: var(--work-fit-good);
+}
+
+.cafe-marker--ok {
+  --marker-border: var(--work-fit-ok);
+}
+
+.cafe-marker--bad {
+  --marker-border: var(--work-fit-bad);
 }
 
 .cafe-marker__photo {
@@ -161,10 +226,11 @@ a {
 
 /* 사진이 없는 카페 — 같은 자리, 같은 크기의 빈 핀 */
 .cafe-marker__blank {
+  position: relative;
   display: block;
   width: 100%;
   height: 100%;
-  background: rgba(128, 128, 128, 0.28);
+  background: var(--surface-container-high);
 }
 
 .cafe-marker__blank::after {
@@ -172,24 +238,21 @@ a {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 12px;
-  height: 12px;
-  margin: -6px 0 0 -6px;
-  border-radius: 50%;
-  background: rgba(70, 70, 70, 0.65);
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: var(--r-full);
+  background: var(--outline);
 }
 
 .cafe-marker--selected {
-  border-color: #2f6df6;
-  transform: scale(1.18);
-}
-
-.cafe-marker-anchor:has(.cafe-marker--selected)::after {
-  border-top-color: #2f6df6;
+  --marker-border: var(--primary);
+  transform: scale(1.14);
+  box-shadow: var(--shadow-marker-selected);
 }
 
 /* ---------------------------------------------------------------
-   상세 패널 — 데스크톱 우측 / 모바일 하단 시트
+   상세 패널 — 데스크톱 우측 오버레이 / 모바일 하단 시트
    --------------------------------------------------------------- */
 
 .cafe-panel {
@@ -197,156 +260,213 @@ a {
   right: 0;
   bottom: 0;
   left: 0;
-  z-index: 4;
+  z-index: 3;
   display: flex;
   flex-direction: column;
   /* 지도를 완전히 덮지 않는다 — 어느 마커를 눌렀는지 보이게 둔다 */
   max-height: 60dvh;
-  border-radius: 16px 16px 0 0;
-  background: var(--background);
-  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.22);
+  border-radius: 32px 32px 0 0;
+  background: var(--surface);
+  box-shadow: var(--shadow-brew);
   overflow: hidden;
 }
 
 @media (min-width: 900px) {
   .cafe-panel {
-    position: static;
-    flex: none;
-    width: 360px;
+    top: var(--sp-md);
+    right: var(--sp-md);
+    bottom: var(--sp-md);
+    left: auto;
+    width: 400px;
     max-height: none;
-    height: 100%;
-    border-radius: 0;
-    border-left: 1px solid rgba(128, 128, 128, 0.25);
-    box-shadow: none;
+    border-radius: 32px;
   }
 }
 
 .cafe-panel__close {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: var(--sp-md);
+  right: var(--sp-md);
   z-index: 2;
-  width: 32px;
-  height: 32px;
+  display: grid;
+  place-items: center;
+  width: var(--sp-xl);
+  height: var(--sp-xl);
   border: 0;
-  border-radius: 50%;
-  /* 사진 위에 얹히므로 배경색을 따라가지 않고 항상 어둡게 깐다 */
-  background: rgba(0, 0, 0, 0.5);
-  color: #ffffff;
-  font-size: 20px;
+  border-radius: var(--r-full);
+  background: var(--surface-container-lowest);
+  color: var(--on-surface-variant);
+  font-size: 18px;
   line-height: 1;
   cursor: pointer;
+  box-shadow: var(--shadow-marker);
 }
 
-/* 사진은 위에 고정하고 스펙만 스크롤한다 */
+/* 사진은 위에 고정하고 그 아래만 스크롤한다 */
 .cafe-panel__body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 20px 16px;
-}
-
-.cafe-panel__name {
-  font-size: 18px;
-  font-weight: 700;
+  padding: var(--sp-lg) 20px var(--sp-xl);
 }
 
 .cafe-panel__address {
-  margin-top: 4px;
-  font-size: 13px;
-  opacity: 0.65;
-}
-
-.cafe-panel__badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 12px;
-}
-
-.badge {
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: rgba(128, 128, 128, 0.15);
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.badge--open {
-  background: rgba(34, 160, 90, 0.18);
-  color: #1c7a45;
-}
-
-.badge--closed {
-  background: rgba(190, 60, 60, 0.16);
-  color: #a13a3a;
-}
-
-@media (prefers-color-scheme: dark) {
-  .badge--open {
-    color: #6fd99b;
-  }
-  .badge--closed {
-    color: #e58b8b;
-  }
-}
-
-.cafe-panel__specs {
-  margin-top: 16px;
-  display: grid;
-  gap: 8px;
-}
-
-.cafe-panel__specs > div {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
   font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+  color: var(--on-surface-variant);
 }
 
-.cafe-panel__specs dt {
-  opacity: 0.6;
+.cafe-panel__name {
+  margin-top: var(--sp-xs);
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 32px;
 }
 
-.cafe-panel__specs dd {
-  font-weight: 500;
-}
-
-.cafe-panel__tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 14px;
-  list-style: none;
-}
-
-.cafe-panel__tags li {
-  font-size: 12px;
-  opacity: 0.55;
-}
-
-.cafe-panel__link {
-  display: inline-block;
-  margin-top: 16px;
+/* 네이버 지도 링크 — primary CTA가 아니다. 초록은 N 글자에만 */
+.naver-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  height: 36px;
+  margin-top: var(--sp-md);
+  padding: 0 var(--sp-md);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--r-full);
+  background: var(--surface-container-lowest);
+  color: var(--on-surface-variant);
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 700;
+  line-height: 20px;
 }
 
-.cafe-panel__verified {
-  margin-top: 14px;
-  font-size: 12px;
-  opacity: 0.45;
+.naver-link__mark {
+  color: var(--naver);
+  font-size: 15px;
+  font-weight: 800;
 }
 
 /* ---------------------------------------------------------------
-   사진 슬라이드 (components/cafe/PhotoCarousel.tsx)
+   Quick Check — 판단 신호를 여기 모은다
+   --------------------------------------------------------------- */
+
+.quick-check {
+  margin-top: var(--sp-lg);
+}
+
+.fact-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-sm);
+  margin-top: var(--sp-sm);
+  list-style: none;
+}
+
+.fact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+  padding: 12px;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--r-md);
+  background: var(--warm-cream);
+}
+
+/* 다섯 번째 fact는 한 줄을 다 쓴다 */
+.fact:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+}
+
+.fact__icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-sm);
+  background: var(--surface-container);
+  color: var(--primary);
+}
+
+.fact__icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* 좋은 조건일 때만 색이 든다 */
+.fact--positive .fact__icon {
+  background: var(--pastel-mint);
+  color: var(--positive-text);
+}
+
+.fact--positive .fact__value {
+  color: var(--positive-text);
+}
+
+.fact__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fact__label {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+  color: var(--on-surface-variant);
+}
+
+.fact__value {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+  color: var(--on-surface);
+}
+
+/* ---------------------------------------------------------------
+   자리와 분위기 힌트 · 확인일
+   --------------------------------------------------------------- */
+
+.cafe-panel__hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-sm);
+  margin-top: var(--sp-sm);
+  list-style: none;
+}
+
+.cafe-panel__hints li {
+  padding: 4px 10px;
+  border-radius: var(--r-full);
+  background: var(--surface-container);
+  color: var(--on-surface-variant);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+}
+
+/* 데이터 신선도를 숨기지 않는다 (mvp-decisions.md 2-3) */
+.cafe-panel__verified {
+  margin-top: var(--sp-lg);
+  padding-top: var(--sp-md);
+  border-top: 1px solid var(--outline-variant);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  color: var(--on-surface-variant);
+}
+
+/* ---------------------------------------------------------------
+   사진 슬라이드
    --------------------------------------------------------------- */
 
 .photo-carousel {
   position: relative;
   flex: none;
   height: 190px;
-  background: rgba(128, 128, 128, 0.12);
+  background: var(--surface-container);
 }
 
 @media (min-width: 900px) {
@@ -386,40 +506,45 @@ a {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  width: 32px;
-  height: 32px;
+  display: grid;
+  place-items: center;
+  width: var(--sp-xl);
+  height: var(--sp-xl);
   border: 0;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.45);
-  color: #ffffff;
-  font-size: 20px;
+  border-radius: var(--r-full);
+  background: var(--surface-container-lowest);
+  color: var(--on-surface-variant);
+  font-size: 18px;
   line-height: 1;
   cursor: pointer;
+  box-shadow: var(--shadow-marker);
 }
 
 .photo-carousel__nav:disabled {
-  opacity: 0.25;
+  opacity: 0.35;
   cursor: default;
 }
 
 .photo-carousel__nav--prev {
-  left: 8px;
+  left: var(--sp-sm);
 }
 
 .photo-carousel__nav--next {
-  right: 8px;
+  right: var(--sp-sm);
 }
 
 /* 몇 번째 사진인지 — 오른쪽 아래 */
 .photo-carousel__count {
   position: absolute;
-  right: 10px;
-  bottom: 10px;
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.55);
-  color: #ffffff;
+  right: var(--sp-sm);
+  bottom: var(--sp-sm);
+  padding: 3px 10px;
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--on-surface) 62%, transparent);
+  color: var(--surface-container-lowest);
   font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -430,6 +555,13 @@ a {
   justify-content: center;
   height: 110px;
   aspect-ratio: auto;
-  font-size: 13px;
-  opacity: 0.5;
+  color: var(--on-surface-variant);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cafe-marker {
+    transition: none;
+  }
 }

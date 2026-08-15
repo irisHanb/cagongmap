@@ -9,6 +9,10 @@ import KakaoMap from './KakaoMap';
 /** 송리단길 일대 — 송파·잠실 권역 기준점 (docs/scope.md) */
 const INITIAL_CENTER = { lat: 37.5078, lng: 127.1072 };
 
+/**
+ * 지도가 화면 전부를 쓰고, 나머지 UI는 그 위에 뜬다 (DESIGN.md — Map Shell).
+ * 상단 헤더 바를 두지 않는 이유가 그것이다.
+ */
 export default function MapView({ cafes }: { cafes: Cafe[] }) {
   const [selected, setSelected] = useState<Cafe | null>(null);
 
@@ -17,26 +21,25 @@ export default function MapView({ cafes }: { cafes: Cafe[] }) {
   const handleClose = useCallback(() => setSelected(null), []);
 
   return (
-    <main className="map-view">
-      <header className="map-view__header">
+    <main className={`map-view${selected ? ' map-view--detail' : ''}`}>
+      <KakaoMap center={INITIAL_CENTER} level={5}>
+        <CafeMarkers
+          cafes={cafes}
+          selectedId={selected?.id ?? null}
+          onSelect={handleSelect}
+        />
+      </KakaoMap>
+
+      {/* 탐색 결과를 늘어놓는 곳이 아니라 지도 탐색을 시작하는 dock이다.
+          검색바·로그인·북마크는 아직 스코프 밖이라 자리만 비어 있다. */}
+      <div className="brand-dock">
+        <p className="eyebrow">WORK CAFE MAP</p>
         <h1>카공맵</h1>
-        <p>노트북 작업하기 좋은 카페 · 송파·잠실</p>
-      </header>
-
-      {/* 데스크톱에서는 지도와 패널이 가로로 나뉘고, 모바일에서는 패널이 지도 위로
-          올라온다. 지도가 좁아지는 쪽은 KakaoMap이 relayout으로 알아서 따라간다. */}
-      <div className="map-view__body">
-        <KakaoMap center={INITIAL_CENTER} level={5}>
-          <CafeMarkers
-            cafes={cafes}
-            selectedId={selected?.id ?? null}
-            onSelect={handleSelect}
-          />
-        </KakaoMap>
-
-        {/* key로 카페마다 새로 마운트해 사진 슬라이드를 첫 장으로 되돌린다 */}
-        {selected && <CafeCard key={selected.id} cafe={selected} onClose={handleClose} />}
+        <p className="brand-dock__sub">오래 앉아 작업하기 좋은 카페 {cafes.length}곳</p>
       </div>
+
+      {/* key로 카페마다 새로 마운트해 사진 슬라이드를 첫 장으로 되돌린다 */}
+      {selected && <CafeCard key={selected.id} cafe={selected} onClose={handleClose} />}
     </main>
   );
 }
