@@ -23,6 +23,33 @@ npm start        # 프로덕션 실행 — 포트 3030 고정
 - **타입체크는 `npx tsc --noEmit`이 아니라 `npm run build`로 한다.** 단독 `tsc`는 Next.js가 생성하는 전역 타입(`LayoutProps` 등)을 모르기 때문에 실패한다.
 - 테스트 프레임워크는 아직 없다.
 
+## 브라우저 검증
+
+**화면을 눈으로 확인할 때는 `playwright-cli`를 쓴다.** `.claude/skills/playwright-cli`에
+skill이 깔려 있다.
+
+```bash
+playwright-cli open http://localhost:3030   # 브라우저 띄우고 바로 이동
+playwright-cli snapshot                     # 요소 ref가 붙은 페이지 스냅샷
+playwright-cli find "카카오 로그인"           # 스냅샷에서 텍스트 찾기
+playwright-cli click e15                    # ref로 클릭
+playwright-cli console                      # 콘솔 로그
+playwright-cli close
+```
+
+- **`snapshot`이 기본이고 `screenshot`은 예외다.** 스냅샷은 요소 ref가 붙은 텍스트라
+  클릭 대상을 좌표로 찍지 않아도 되고 토큰도 훨씬 적게 든다. 스크린샷은 레이아웃이나
+  색처럼 **눈으로만 판별되는 것**을 볼 때만 쓴다.
+- **빌드가 통과했다는 것과 화면이 도는 것은 다르다.** 이 저장소는 테스트 프레임워크가
+  없으므로, UI를 건드렸으면 `npm run build`로 끝내지 말고 실제로 띄워서 확인한다.
+- 개발 서버를 먼저 띄워야 한다(`npm run dev`). 서버가 없으면 빈 페이지를 보고
+  "고쳤다"고 말하게 된다.
+- 지도는 `NEXT_PUBLIC_KAKAO_MAP_KEY`가 있어야 그려진다. 키가 없으면 안내 문구가
+  대신 뜨는데 그것은 의도된 폴백이지 깨진 화면이 아니다.
+- **로그인이 필요한 화면은 대신 로그인해 주지 않는다.** 카카오 계정 자격증명을
+  입력하는 일은 사람이 한다. 에이전트는 로그아웃 상태 흐름까지만 확인하고,
+  그 뒤는 확인하지 못했다고 말한다.
+
 ## 환경변수
 
 `.env.local`에 셋이 필요하다.
