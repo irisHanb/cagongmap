@@ -13,15 +13,54 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 명령어
 
 ```bash
-npm run dev      # 개발 서버 — 포트 3030 고정
-npm run build    # 프로덕션 빌드 (여기서 TypeScript 타입체크가 함께 돌아간다)
-npm run lint     # eslint
-npm start        # 프로덕션 실행 — 포트 3030 고정
+npm run dev        # 개발 서버 — 포트 3030 고정
+npm start          # 프로덕션 실행 — 포트 3030 고정
+npm run build      # 프로덕션 빌드 (타입체크가 함께 돌아간다)
+
+npm run verify     # lint → typecheck → test. 커밋 훅이 부르는 것도 이것이다
+npm run lint       # eslint — warning도 실패로 친다
+npm run typecheck  # next typegen && tsc --noEmit
+npm run test       # vitest watch
+npm run test:run   # vitest 1회 실행
 ```
 
 - **포트는 3030이다.** 카카오 콘솔 플랫폼 도메인이 `http://localhost:3030`으로 등록되어 있어, 다른 포트로 띄우면 지도가 뜨지 않는다.
-- **타입체크는 `npx tsc --noEmit`이 아니라 `npm run build`로 한다.** 단독 `tsc`는 Next.js가 생성하는 전역 타입(`LayoutProps` 등)을 모르기 때문에 실패한다.
-- 테스트 프레임워크는 아직 없다.
+- **타입체크에 `npx tsc --noEmit`을 단독으로 부르지 않는다.** Next.js가 생성하는 전역
+  타입(`LayoutProps` 등)을 모르기 때문에 실패한다. `npm run typecheck`가 앞에
+  `next typegen`을 붙여 그 타입을 먼저 만든다. 빌드 없이 몇 초에 끝나므로
+  타입만 볼 때 `npm run build`를 돌릴 이유가 없다.
+- **`npm run lint`는 `--max-warnings=0`이다.** warning을 남겨 두면 exit 0으로 통과해
+  아무도 보지 않게 된다.
+
+### pre-commit 훅
+
+**커밋할 때마다 `npm run verify`가 자동으로 돈다**(4~5초). 실패하면 커밋이 멈춘다.
+
+- 훅 본체는 `.githooks/pre-commit`이고 **저장소에 커밋돼 있다.** `.git/hooks/`가 아니라
+  여기 두는 이유는 그래야 내용이 리뷰되고 공유되기 때문이다.
+- 연결은 `package.json`의 `prepare` 스크립트가 한다 — `git config core.hooksPath .githooks`.
+  npm이 `npm install` 뒤에 자동으로 부르므로 따로 설치할 것이 없다. **husky를 쓰지 않는다.**
+- **스테이지된 파일만 골라 검사하지 않는다.** typecheck와 test는 파일 단위로 쪼개면
+  의미를 잃는다 — 한 파일을 고쳐서 깨지는 곳은 대개 그 파일이 아니다.
+- ⚠️ **훅은 작업 트리를 본다. 스테이지 내용이 아니다.** 스테이지하지 않은 변경이 있으면
+  방금 통과한 것과 실제로 커밋되는 내용이 다르다. 훅이 그럴 때 한 줄로 알려 준다.
+- 일부러 건너뛰려면 `git commit --no-verify`.
+
+### 테스트 (Vitest)
+
+- 테스트 파일은 대상 옆에 둔다 — `lib/openState.ts` ↔ `lib/openState.test.ts`.
+- **`Cafe`·`PlaceRow` 더미는 `test/fixtures.ts`의 `makeCafe()` / `makePlaceRow()`를 쓴다.**
+  객체를 통째로 새로 적으면 필드가 하나 늘 때마다 모든 테스트를 고쳐야 하고, 그
+  테스트가 어떤 값에 관심 있는지가 묻힌다. 관심 있는 필드만 덮어쓴다.
+- **`globals: false`다.** `describe`/`it`/`expect`를 `vitest`에서 명시적으로 import한다.
+- **`lib/supabase-env.ts`가 import 시점에 throw하는 것을 앱 코드로 풀지 않는다.**
+  폴백을 두지 않는 것이 의도된 설계이므로, 더미 값은 `vitest.config.mts`의 `test.env`에
+  있다.
+- 세션이 필요한 컴포넌트는 **`@/lib/supabase-browser` 하나만 `vi.mock`한다.**
+  AuthProvider·BookmarkProvider는 실제 코드가 돌게 둔다 (`components/cafe/CafeCard.test.tsx` 참고).
+- 실제 Supabase에 붙는 테스트는 없다. DB 쪽 검증은 `./scripts/verify-schema.sh`가 따로 한다.
+- **`npm run verify`가 초록인 것과 화면이 도는 것은 다르다.** UI를 건드렸으면 아래
+  「브라우저 검증」을 따른다.
 
 ## 브라우저 검증
 
