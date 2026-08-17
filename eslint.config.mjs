@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // 검증 도구가 만드는 산출물. 소스가 아니다.
+    "coverage/**",
+    ".playwright/**",
+    ".playwright-cli/**",
   ]),
 ]);
 
