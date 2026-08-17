@@ -9,6 +9,7 @@
 |---|---|
 | `supabase/migrations/20260814000001_places.sql` | enum, `places`, 인덱스, 공개 조회 RLS |
 | `supabase/migrations/20260814000002_profiles_and_submissions.sql` | `profiles`, `place_submissions`, 승인/반려 함수, RLS |
+| `supabase/migrations/20260815000001_bookmarks.sql` | `bookmarks`, RLS |
 | `supabase/migrations/20260814000003_seed_places.sql` | 카페 9곳 (`scripts/generate-seed.mjs`로 `data/cafes.json`에서 생성) |
 | `supabase/migrations/20260814000004_places_photos.sql` | `places.photos` 추가 |
 | `supabase/migrations/20260814100834_place_photos_from_storage.sql` | `place-images` 버킷 사진 9장을 `photos`에 연결 |
@@ -133,6 +134,30 @@ DB 제약으로 박아둔 것이다. 속성이 빈 제보는 자동으로 `draft
 - `approve_submission(uuid)`: 반영과 상태 변경을 한 트랜잭션에서 처리한다. `jsonb_populate_record`로 기존 행 위에 payload를 덮으므로 부분 수정이 자연스럽게 된다. **승인 = 운영자가 확인한 것**이므로 `last_verified`를 오늘로 갱신한다.
 - `reject_submission(uuid, text)`: 반려 + 사유.
 
+---
+
+## `bookmarks`
+
+사용자가 저장한 장소. 2026-08-15에 들어왔다 (scope.md 변경 이력).
+
+```
+bookmarks (user_id, place_id, created_at)
+primary key (user_id, place_id)
+```
+
+- **PK가 곧 중복 방지이자 조회 인덱스다.** 같은 카페를 두 번 저장하는 것을 PK가 막고,
+  "내 북마크"(`user_id`로 시작하는 조회)가 같은 인덱스를 그대로 탄다. 별도 unique
+  인덱스나 대리키 `id`를 두지 않았다.
+- `place_id`에 별도 인덱스를 하나 더 걸었다. PK 순서상 `place_id` 단독 조회는 PK를
+  못 타는데, `places` 삭제 시 cascade가 이 경로를 쓴다.
+- **FK는 `places.id`(uuid)다. `slug`가 아니다.** 앱이 카페를 부르는 키는 slug지만
+  `slug`는 nullable이라(제보로 등록돼 큐레이터가 아직 붙이지 않은 카페) 참조 무결성을
+  주지 못한다. slug ↔ uuid 변환은 `lib/bookmarks.ts`가 맡는다.
+- **소유자 컬럼 이름은 `user_id`다.** 이 저장소는 테이블마다 다르다 —
+  `profiles.id`, `place_submissions.submitted_by`, `bookmarks.user_id`.
+- 저장해 둔 카페가 `draft`·`hidden`·`closed`로 바뀌면 `places` RLS가 그 행을 감춘다.
+  목록에서는 빠지지만 북마크는 남는다. 다시 `published`가 되면 되살아난다.
+
 ### RLS 요약
 
 | 대상 | anon | authenticated | curator/admin |
@@ -140,9 +165,15 @@ DB 제약으로 박아둔 것이다. 속성이 빈 제보는 자동으로 `draft
 | `places` | `published`만 select | 동일 | 전체 select·insert·update |
 | `profiles` | select | 본인 update (role 제외) | — |
 | `place_submissions` | 접근 불가 | 본인 것 insert·select, pending일 때 update | 전체 + 승인/반려 |
+| `bookmarks` | 접근 불가 | 본인 것 select·insert·delete | 예외 없음 (본인 것만) |
 
 카페 데이터 쓰기는 큐레이터 정책 또는 `service_role`(서버 전용 키)로만 가능하다.
 `NEXT_PUBLIC_` anon 키로는 어떤 카페도 수정할 수 없다.
+
+**`bookmarks`에는 `UPDATE` 정책이 없다. 일부러다.** 고칠 값이 없는 테이블이라
+(`user_id`·`place_id`는 PK, `created_at`은 기록) 해제는 `delete`로 한다. 정책이 없는
+명령은 거부되므로 update는 전부 막힌 상태이며, 이는 빠뜨린 것이 아니라 설계다.
+**큐레이터도 남의 북마크를 보지 못한다** — 운영에 필요한 정보가 아니다.
 
 ---
 
@@ -150,7 +181,7 @@ DB 제약으로 박아둔 것이다. 속성이 빈 제보는 자동으로 `draft
 
 ```bash
 supabase link --project-ref <ref>
-supabase db push          # 마이그레이션 3개 — 스키마 2개 + 카페 9곳
+supabase db push          # 스키마 + 카페 9곳 + 북마크
 ```
 
 환경변수는 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`가 추가로 필요하다
@@ -167,7 +198,7 @@ supabase db push          # 마이그레이션 3개 — 스키마 2개 + 카페 
 
 | 항목 | 결과 |
 |---|---|
-| 마이그레이션 3개 적용, 카페 9곳 published 적재 | 통과 |
+| 마이그레이션 전체 적용, 카페 9곳 published 적재 | 통과 |
 | anon은 `published`만 조회, 카페 추가 불가 | 통과 |
 | `places_published_requires_core` (핵심 속성·확인일 없이 공개 불가) | 통과 |
 | `places_hours_required`, 시간 정규식, 좌표 범위 | 통과 |
@@ -178,9 +209,18 @@ supabase db push          # 마이그레이션 3개 — 스키마 2개 + 카페 
 | payload 금지 키 차단, 반려 흐름 | 통과 |
 | 남의 제보는 조회 불가, 큐레이터는 전체 조회 | 통과 |
 | `updated_at` 트리거, `"HH:mm"` 형식 유지 | 통과 |
+| 북마크: 본인 것만 조회, anon은 0건, 큐레이터도 남의 것 못 봄 | 통과 |
+| 북마크: 남의 uid로 insert 차단, 남의 행 delete 0건, 본인 것 delete 1건 | 통과 |
+| 북마크: `update` 정책 부재 → 읽히는 행도 0건 갱신 | 통과 |
+| 북마크: 같은 카페 중복 저장 차단 (PK) | 통과 |
 
 검증 과정에서 실제로 하나 고쳤다: 승인 시 `place_id`를 되채우는 동작이
 `kind='new'`는 대상이 없어야 한다는 제약과 충돌했다. 제약을 대기 중 상태로 한정해 해결했다.
+
+북마크 검증에서도 하나 배웠다. **정책 없는 `UPDATE`는 예외를 던지지 않고 "해당 행 없음"이
+된다.** `insufficient_privilege`를 기대한 테스트가 실패해서 알았다. `INSERT`의 `with check`
+위반만 예외가 되고, `UPDATE`·`DELETE`는 조용히 0건이다. 그래서 그 검사는
+"select로는 1건 보이는 상태에서 update는 0건"으로 적어야 의미가 생긴다.
 
 **스텁의 한계.** `supabase/tests/00_stub_supabase.sql`은 `auth` 스키마와
 `anon`/`authenticated` 역할을 흉내 낸 것이라, 실제 Supabase의 기본 grant·JWT 연동까지

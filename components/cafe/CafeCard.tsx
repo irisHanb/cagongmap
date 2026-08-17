@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import type { Cafe } from '@/types/cafe';
 import { NOISE_LABEL, OUTLET_LABEL } from '@/types/cafe';
 import { formatBusinessHours, isOpenNow } from '@/lib/openState';
+import BookmarkButton from '@/components/bookmark/BookmarkButton';
 import PhotoCarousel from './PhotoCarousel';
 import {
   HoursIcon,
@@ -89,7 +90,12 @@ export default function CafeCard({ cafe, onClose }: CafeCardProps) {
 
       <div className="cafe-panel__body">
         <p className="cafe-panel__address">{cafe.address}</p>
-        <h2 className="cafe-panel__name">{cafe.name}</h2>
+        {/* 하트는 이름과 같은 줄이다. DESIGN.md의 상세 구성 순서에 항목을 새로
+            끼워 넣지 않으려고 3번(카페명) 안에 넣었다. */}
+        <div className="cafe-panel__name-row">
+          <h2 className="cafe-panel__name">{cafe.name}</h2>
+          <BookmarkButton cafe={cafe} />
+        </div>
 
         {cafe.naver_place_url && (
           <a

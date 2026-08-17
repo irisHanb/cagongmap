@@ -28,6 +28,8 @@
   --positive-text: #214f49;
   --warm-cream: #fffef9;
   --naver: #03c75a;
+  --kakao: #fee500;
+  --on-kakao: rgba(0, 0, 0, 0.85);
 
   /* work_fit — 마커 테두리 전용. 좋음만 색을 갖고 나머지는 무채색으로 눕힌다 */
   --work-fit-good: var(--tertiary);
@@ -175,6 +177,280 @@ a {
   color: var(--on-surface-variant);
 }
 
+/* ---------------------------------------------------------------
+   dock 로그인 영역 — DESIGN.md Left Panel 5번
+   --------------------------------------------------------------- */
+
+.auth-dock {
+  margin-top: var(--sp-md);
+}
+
+/* 카카오 노랑은 로그인 전 화면에서 유일하게 큰 면적을 갖는 색이다.
+   border도 그림자도 얹지 않는다 — 색만으로 충분하다 (DESIGN.md — Kakao Login) */
+.kakao-login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-sm);
+  width: 100%;
+  height: 48px;
+  padding: 0 var(--sp-md);
+  border: none;
+  border-radius: var(--r-full);
+  background: var(--kakao);
+  color: var(--on-kakao);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.kakao-login:hover {
+  filter: brightness(0.96);
+}
+
+.kakao-login svg {
+  width: 18px;
+  height: 18px;
+}
+
+.auth-profile {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  min-height: 48px;
+  padding: var(--sp-sm) var(--sp-sm) var(--sp-sm) var(--sp-sm);
+  border-radius: var(--r-full);
+  background: var(--surface-container-low);
+}
+
+.auth-profile__avatar {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-full);
+  object-fit: cover;
+}
+
+.auth-profile__avatar--fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary-container);
+  color: var(--on-primary-container);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+/* 긴 닉네임·이메일이 로그아웃 버튼을 밀어내지 않게 여기서 줄인다 */
+.auth-profile__text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.auth-profile__name {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auth-profile__email {
+  overflow: hidden;
+  color: var(--on-surface-variant);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auth-profile__signout {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-right: var(--sp-xs);
+  padding: 0;
+  border: none;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--on-surface-variant);
+  cursor: pointer;
+}
+
+.auth-profile__signout:hover {
+  background: var(--surface-container-high);
+  color: var(--on-surface);
+}
+
+.auth-profile__signout svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* 실패는 색으로 강조하지 않는다 — 색이 드는 것은 좋은 조건뿐이다 (DESIGN.md) */
+.auth-dock__error {
+  margin-top: var(--sp-sm);
+  color: var(--on-surface-variant);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+/* ---------------------------------------------------------------
+   북마크 패널 — DESIGN.md Left Panel 6번
+   --------------------------------------------------------------- */
+
+.bookmark-panel {
+  margin-top: var(--sp-md);
+  padding: var(--sp-md);
+  /* 20px은 DESIGN.md components.bookmark-panel이 정한 값이다.
+     radius 스케일(24px)과 다른 것은 의도된 예외다. */
+  border: 1px solid var(--outline-variant);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.bookmark-panel__title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-sm);
+  margin-top: var(--sp-xs);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 28px;
+}
+
+.bookmark-panel__count {
+  color: var(--on-surface-variant);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.bookmark-panel__empty {
+  margin-top: var(--sp-xs);
+  color: var(--on-surface-variant);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+/* 후보 리스트의 대체물이 아니다. 사진 카드로 키우지 않고 두 줄만 놓는다 */
+.bookmark-list {
+  display: flex;
+  max-height: 216px;
+  flex-direction: column;
+  margin-top: var(--sp-sm);
+  gap: var(--sp-xs);
+  overflow-y: auto;
+  list-style: none;
+}
+
+.bookmark-list__item {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  padding: var(--sp-sm);
+  border: none;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bookmark-list__item:hover {
+  background: var(--surface-container);
+}
+
+.bookmark-list__name {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bookmark-list__address {
+  overflow: hidden;
+  color: var(--on-surface-variant);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------
+   모달 — 로그인 안내. DESIGN.md에 규격이 없어 기존 토큰만으로 짰다
+   --------------------------------------------------------------- */
+
+.modal-scrim {
+  position: fixed;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-md);
+  background: rgba(33, 27, 26, 0.42);
+  backdrop-filter: blur(3px);
+  inset: 0;
+}
+
+.modal {
+  width: 100%;
+  max-width: 320px;
+  padding: var(--sp-lg);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+  box-shadow: var(--shadow-brew);
+}
+
+.modal__title {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 28px;
+}
+
+.modal__body {
+  margin-top: var(--sp-sm);
+  margin-bottom: var(--sp-md);
+  color: var(--on-surface-variant);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.modal__dismiss {
+  width: 100%;
+  height: 40px;
+  margin-top: var(--sp-sm);
+  padding: 0;
+  border: none;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--on-surface-variant);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.modal__dismiss:hover {
+  background: var(--surface-container);
+  color: var(--on-surface);
+}
+
 /* 상세가 열리면 xl 미만에서 dock을 숨긴다 — 지도와 상세가 부딪히지 않게 */
 @media (max-width: 1279px) {
   .map-view--detail .brand-dock {
@@ -317,11 +593,52 @@ a {
   color: var(--on-surface-variant);
 }
 
-.cafe-panel__name {
+/* 이름과 하트가 한 줄. 이름이 길어도 하트 자리는 줄지 않는다 */
+.cafe-panel__name-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-sm);
   margin-top: var(--sp-xs);
+}
+
+.cafe-panel__name {
+  flex: 1;
+  min-width: 0;
   font-size: 26px;
   font-weight: 800;
   line-height: 32px;
+}
+
+/* 상세의 북마크 하트. 저장 전에는 무채색 외곽선, 저장 후에만 primary가 든다 */
+.bookmark-button {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--r-full);
+  background: var(--surface-container-lowest);
+  color: var(--outline);
+  cursor: pointer;
+}
+
+.bookmark-button:hover {
+  border-color: var(--primary-container);
+  color: var(--primary);
+}
+
+.bookmark-button--on {
+  border-color: var(--primary-container);
+  background: var(--primary-container);
+  color: var(--primary);
+}
+
+.bookmark-button svg {
+  width: 20px;
+  height: 20px;
 }
 
 /* 네이버 지도 링크 — primary CTA가 아니다. 초록은 N 글자에만 */

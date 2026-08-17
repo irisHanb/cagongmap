@@ -20,15 +20,19 @@ import type { Cafe, NoiseLevel, OutletLevel, WorkFit } from '@/types/cafe';
  *
  * 한 줄 리터럴로 둔다. 문자열을 이어붙이면 supabase-js가 select 결과 타입을
  * 추론하지 못하고 GenericStringError로 떨어진다.
+ *
+ * lib/bookmarks.ts가 이 상수와 toCafe()를 그대로 쓴다. places row → Cafe 변환은
+ * 이 파일 하나에만 있어야 한다 — 북마크가 두 번째 변환 코드를 만들면 두 경로가
+ * 반드시 어긋난다.
  */
-const COLUMNS =
+export const PLACE_COLUMNS =
   'id, slug, name, address, lat, lng, naver_place_url, open_time, close_time, is_24h, iced_americano_price, outlet, wifi, noise, work_fit, photos, tags, last_verified';
 
 /**
  * published 행만 조회하므로 outlet·wifi·noise·work_fit·last_verified는 반드시 채워져
  * 있다 — places_published_requires_core 제약이 DB에서 보장한다. 그래서 non-null로 둔다.
  */
-interface PlaceRow {
+export interface PlaceRow {
   id: string;
   slug: string | null;
   name: string;
@@ -49,7 +53,7 @@ interface PlaceRow {
   last_verified: string;
 }
 
-function toCafe(row: PlaceRow): Cafe {
+export function toCafe(row: PlaceRow): Cafe {
   return {
     // 앱의 키는 slug다('naruteo'). 제보로 등록돼 아직 slug가 없는 카페는 uuid로 버틴다.
     id: row.slug ?? row.id,
@@ -78,7 +82,7 @@ function toCafe(row: PlaceRow): Cafe {
 export async function getCafes(): Promise<Cafe[]> {
   const { data, error } = await supabase
     .from('places')
-    .select(COLUMNS)
+    .select(PLACE_COLUMNS)
     // RLS가 이미 published만 열어주지만, 나중에 큐레이터 세션이 붙어도 지도에는
     // 공개된 카페만 나와야 하므로 조건을 명시한다.
     .eq('status', 'published')
@@ -95,7 +99,7 @@ export async function getCafes(): Promise<Cafe[]> {
 export async function getCafeById(id: string): Promise<Cafe | undefined> {
   const { data, error } = await supabase
     .from('places')
-    .select(COLUMNS)
+    .select(PLACE_COLUMNS)
     .eq('status', 'published')
     .eq('slug', id)
     .returns<PlaceRow[]>()

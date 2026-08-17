@@ -51,6 +51,53 @@ Supabase 쪽은 폴백을 두지 않았다. 원본이 하나여야 하는데 조
 - `select('*')`를 쓰지 않는다. `COLUMNS` 상수는 **한 줄 리터럴이어야** supabase-js가 결과 타입을 추론한다.
 - `app/page.tsx`의 `export const revalidate = 300`이 캐싱을 정한다.
 
+### 인증 (Supabase + 카카오 OAuth)
+
+Supabase 클라이언트가 셋이다. **역할이 달라서 나눈 것이지 취향이 아니다.**
+
+| 파일 | 쓰는 곳 | 세션 |
+|---|---|---|
+| `lib/supabase.ts` | `lib/cafes.ts` — 공개 카페 조회 | 없음 (`persistSession: false`) |
+| `lib/supabase-browser.ts` | 클라이언트 컴포넌트 | 쿠키 |
+| `lib/supabase-server.ts` | route handler, 서버 액션 | 쿠키 |
+
+- **공개 조회에 세션 클라이언트를 쓰지 않는다.** 쿠키를 읽는 순간 `app/page.tsx`의
+  `revalidate = 300`이 죽고 요청마다 동적 렌더가 된다. 카페 목록은 로그인과 무관하다.
+- 같은 이유로 **`AuthDock`이 세션을 클라이언트에서 읽는다.** 서버 컴포넌트에서 유저를
+  꺼내면 페이지 전체가 동적이 된다. 판정 전에는 버튼도 프로필도 그리지 않는다.
+- 환경변수 검사는 `lib/supabase-env.ts` 하나뿐이다. 셋이 같은 검사를 따로 하지 않는다.
+- **세션 갱신 파일은 `middleware.ts`가 아니라 `proxy.ts`다.** Next 16에서 이름이 바뀌었다.
+  Supabase 공식 문서의 `middleware.ts` 예제를 그대로 옮기면 파일이 조용히 무시된다.
+- **PKCE라 콜백 교환을 서버에서 한다** (`app/auth/callback/route.ts`). code verifier가
+  쿠키에 있다.
+- **사용자 이름·avatar는 `user_metadata`에서 읽는다** (`profiles` 테이블이 아니라).
+  카카오가 주는 키가 동의항목에 따라 갈리므로 `name`/`full_name`/… 순서로 훑는다.
+  **이메일은 선택 동의라 없을 수 있다** — 없으면 줄을 뺀다.
+- 카카오 avatar는 `next/image`를 쓰지 않는다. `next.config.ts`의 `remotePatterns`가
+  Supabase Storage만 열어둔 것을 avatar 하나 때문에 넓히지 않는다.
+
+콘솔 설정 두 가지가 맞아야 로그인이 돌아간다.
+
+- Supabase → Authentication → URL Configuration의 Redirect URLs에 `http://localhost:3030/**`
+- 카카오 개발자 콘솔 Redirect URI에 `https://<project-ref>.supabase.co/auth/v1/callback`
+
+### 북마크
+
+- **`lib/bookmarks.ts`가 이음매다.** `lib/cafes.ts`와 같은 규칙 — 컴포넌트는 `bookmarks`
+  테이블을 직접 건드리지 않는다. 다른 점은 세션 클라이언트를 쓴다는 것뿐이고, 그래서
+  **이 파일은 브라우저 전용이다.** 서버에서 부르면 세션이 없어 빈 목록이 돌아온다.
+- **places row → Cafe 변환은 `lib/cafes.ts`의 `toCafe()` 하나뿐이다.** 북마크 조회도
+  `PLACE_COLUMNS`와 `toCafe`를 빌려 쓴다. 두 번째 변환 코드를 만들면 두 경로가 반드시
+  어긋난다.
+- **`bookmarks.place_id`는 uuid FK인데 앱 키는 slug다.** `resolvePlaceId()`가 저장·해제
+  때 한 번 변환한다. 목록 조회는 join이라 변환이 없다.
+- **로그인 여부 판정은 `BookmarkProvider.toggle()` 한 곳에 있다.** 버튼마다 두지 않는다.
+  로그인이 없으면 저장 대신 `loginPrompt`를 세우고 `MapView`가 모달을 띄운다.
+- **북마크 목록에 주인(`userId`)을 같이 들고 렌더 중에 판정한다.** 목록만 들고 로그아웃
+  때 비우면 그 일을 effect가 해야 하고, A가 나가고 B가 들어온 순간 B에게 A의 목록이
+  잠깐 비친다.
+- 저장/해제는 낙관적 갱신이고 실패하면 되돌린다. 하트는 누른 즉시 반응해야 한다.
+
 ### 카카오맵 SDK 통합
 
 명령형 SDK를 React에 붙이는 부분이라 규칙이 몇 가지 있다.
@@ -92,10 +139,19 @@ frontmatter에 색·타이포·radius·간격·그림자·컴포넌트 치수가
 - **`work_fit`은 마커 테두리 색으로만 쓴다.** 상세에는 넣지 않는다.
 - 폰트는 `pretendard` 패키지의 variable + dynamic subset을 `app/layout.tsx`에서 import한다.
 
-⚠️ 아직 남은 충돌: `DESIGN.md`의 좌측 dock은 검색바·카카오 로그인·북마크를 전제로 하는데,
-`mvp-decisions.md` 3절이 **로그인을 스코프에서 제외**했고 `scope.md`는 검색·필터를 2차로
-미뤄뒀다. 그래서 dock에는 브랜드 블록만 들어가 있다. **그 셋을 만들기 전에 어느 문서를
-살릴지 정해야 한다.**
+2026-08-15에 카카오 로그인과 북마크가 dock에 들어왔다. 두 번 다 문서
+(`scope.md`·`mvp-decisions.md`·`DESIGN.md`)를 먼저 갱신하고 코드를 붙였다.
+
+같은 날 `DESIGN.md`에서 뒤집은 규칙이 둘 있다. 이유가 본문에 적혀 있다.
+
+- **로그인 전에도 상세의 하트는 보인다.** 원래 "로그인 전에는 북마크 UI를 숨긴다"였다.
+  저장할 수 있다는 사실 자체가 로그인의 이유라, 그 입구까지 감추면 로그인할 까닭이
+  화면에 남지 않는다. 누르면 로그인 모달이 뜬다.
+- **저장/해제 버튼이 dock이 아니라 상세 패널에 있다.** 저장은 사진과 Quick Check를
+  보면서 판단하는 일이다.
+
+⚠️ 남은 자리: `DESIGN.md` Left Panel의 **4번 검색바만 비어 있다.** `scope.md`가 검색·필터를
+2차로 미뤄둔 그대로다. **동작하지 않는 검색바를 먼저 띄우지 않는다.**
 
 ## 데이터
 
