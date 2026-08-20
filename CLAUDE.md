@@ -98,6 +98,7 @@ playwright-cli close
 | `NEXT_PUBLIC_KAKAO_MAP_KEY` | 지도 대신 안내 문구가 렌더된다 — 의도된 폴백이다 |
 | `NEXT_PUBLIC_SUPABASE_URL` | `lib/supabase.ts`가 즉시 throw한다 |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 위와 같다 |
+| `SUPABASE_SERVICE_ROLE_KEY` | `scripts/approve-submission.mjs`가 거부한다. 앱은 이 키를 쓰지 않는다 — **`NEXT_PUBLIC_`을 붙이지 말 것** |
 
 Supabase 쪽은 폴백을 두지 않았다. 원본이 하나여야 하는데 조용히 JSON으로 되돌아가면 화면이 실제 DB와 다른 것을 보여주기 때문이다.
 
@@ -157,12 +158,110 @@ Supabase 클라이언트가 셋이다. **역할이 달라서 나눈 것이지 �
   어긋난다.
 - **`bookmarks.place_id`는 uuid FK인데 앱 키는 slug다.** `resolvePlaceId()`가 저장·해제
   때 한 번 변환한다. 목록 조회는 join이라 변환이 없다.
-- **로그인 여부 판정은 `BookmarkProvider.toggle()` 한 곳에 있다.** 버튼마다 두지 않는다.
-  로그인이 없으면 저장 대신 `loginPrompt`를 세우고 `MapView`가 모달을 띄운다.
+- **로그인 여부 판정은 `AuthProvider.requireLogin(reason)` 한 곳에 있다.** 버튼마다 두지
+  않는다. 원래 `BookmarkProvider.toggle()`에 있었는데 2026-08-20에 리뷰·제보가 붙으면서
+  올렸다. 로그인이 없으면 `loginPrompt`에 이유를 세우고 `MapView`가 모달 하나를 띄운다.
 - **북마크 목록에 주인(`userId`)을 같이 들고 렌더 중에 판정한다.** 목록만 들고 로그아웃
   때 비우면 그 일을 effect가 해야 하고, A가 나가고 B가 들어온 순간 B에게 A의 목록이
   잠깐 비친다.
 - 저장/해제는 낙관적 갱신이고 실패하면 되돌린다. 하트는 누른 즉시 반응해야 한다.
+
+### 리뷰 · 제보 (UGC 입력)
+
+2026-08-20에 들어왔다. **입력까지만이고 검수 화면은 없다** — 승인·반려는 Supabase
+대시보드에서 함수로 한다.
+
+- **제보 테이블은 둘이다. 하나가 아니다.**
+
+  | 테이블 | 담는 것 | 필수 |
+  |---|---|---|
+  | `place_reports` | 새 장소 제보 | `naver_place_url` |
+  | `place_edit_requests` | 기존 장소 수정 요청 | `place_id` |
+
+  원래 `place_submissions` 하나가 `kind`로 셋을 겸했는데, 필수 항목이 서로 달라 공통
+  컬럼이 `payload jsonb` 하나뿐이었다. **가른 이유가 그것이다** — 한 테이블에 두면
+  둘 다 nullable이 되고 DB가 아무것도 보장하지 못한다. 2026-08-20에 갈랐고
+  `place_submissions`·`approve_submission()`·`submission_kind`는 없앴다.
+- **사진 컬럼 이름은 세 테이블 모두 `photos`다.** `places`·`place_reports`·
+  `place_edit_requests`가 같은 규칙을 쓴다 — 값은 `place-images` 버킷의 오브젝트
+  경로이고, URL이나 공백이 들어오면 check 제약이 막는다.
+- **`lib/reviews.ts`·`lib/submissions.ts`가 이음매다.** `lib/cafes.ts`와 같은 규칙이고,
+  세션이 필요하므로 둘 다 브라우저 전용이다.
+- **slug → uuid 변환은 `lib/place-id.ts` 하나뿐이다.** 북마크·리뷰·제보가 같이 쓴다.
+- **리뷰 집계는 `place_review_counts()` RPC로만 읽는다.** `place_reviews`를 직접 select하면
+  누가 어디에 `bad`를 눌렀는지가 통째로 나온다. 테이블 select는 본인 행만 열려 있다.
+- **승인 함수는 카페를 만들지도 고치지도 않는다.** 두 테이블 어느 쪽도 `places`를 채울
+  만큼의 정보를 담지 않기 때문이다(제보는 URL·사진·메모, 수정 요청은 사진·메모).
+  큐레이터가 `places`를 직접 만들거나 고친 뒤 함수로 연결·기록만 한다.
+  - `approve_place_report(제보id, 카페id)` — 만든 카페에 연결하고 `approved`로.
+  - `approve_edit_request(요청id)` — `places.last_verified`를 오늘로 옮기고 `approved`로.
+  - `reject_place_report(id, 사유)` / `reject_edit_request(id, 사유)`
+- **신규 제보는 그것만으로 카페가 되지 않는다.** 폼이 그 사실을 사용자에게 말한다.
+- **storage 마이그레이션에서 `alter table ... enable row level security`와 `grant`를 쓰지
+  않는다.** 이미 켜져 있고 이미 grant돼 있으며, `alter table`은 소유자만 되므로 깨진다.
+  `create policy`와 버킷 insert/upsert는 통과한다.
+
+### 카페 이미지 (버킷 하나)
+
+**카페와 관련된 이미지는 전부 Supabase Storage의 `place-images` 버킷을 쓴다.**
+외부 CDN 이미지를 화면에 얹지 않는다 — 카카오맵 응답 URL 저장 금지(크롤링 금지)와
+저작권 확인 결정이 여기 걸려 있다. 유일한 예외는 카카오 avatar이고, 그것은 카페
+이미지가 아니라 프로필이다.
+
+- **테이블마다 담는 모양이 다르다. 목적이 다르기 때문이다.**
+
+  | 컬럼 | 값 | 왜 |
+  |---|---|---|
+  | `places.photos` | 경로 (`naruteo.jpeg`) | 오래 남고 앱이 매번 읽는다. URL을 담으면 프로젝트 ref가 데이터에 박혀 프로젝트를 옮길 때 전부 죽는다 |
+  | `place_reports.photos`<br>`place_edit_requests.photos` | **공개 URL** | 검수자가 대시보드에서 값을 그대로 클릭해 열어야 한다. 검수가 끝나면 수명이 끝나는 데이터라 ref가 박히는 대가를 치를 만하다 |
+
+  check 제약이 양쪽을 서로 막는다 — `places`에 URL을 넣거나 제보에 경로를 넣으면 거부된다.
+  제보 쪽은 `place-images` 공개 객체 URL 모양까지 강제하므로 외부 CDN 이미지는 들어올 수 없다.
+- **URL 조립과 해체는 `lib/place-images.ts` 한 곳뿐이다** (`placeImageUrl` /
+  `placeImagePath`). `toCafe()`가 전자를 불러 `Cafe.photos`를 URL로 만들어 주므로
+  **컴포넌트는 버킷을 모른다.** `getPublicUrl`은 문자열만 만들고 네트워크를 타지 않아
+  서버에서도 안전하다. 승인 스크립트는 후자로 URL에서 경로를 되짚어 파일을 옮긴다.
+- **경로가 곧 상태다.**
+
+  | 경로 | 뜻 | 누가 쓰나 |
+  |---|---|---|
+  | `submissions/<uid>/<uuid>.jpg` | 검수 전 제보 사진 | 본인만 (storage 정책) |
+  | `<slug>/<uuid>.jpg` | 승인된 카페 사진 | service_role 스크립트만 |
+
+- ⚠️ **공개 버킷이므로 검수 전 사진도 URL을 안다면 열린다.** 대신 로그인 사용자는
+  자기 `submissions/<uid>/` 아래에만 쓸 수 있고, 버킷에 5MB·이미지 3종 제한이 걸려
+  있다. 그 둘이 방어선이다.
+- **`submission-images`(비공개) 버킷은 폐기됐다.** 2026-08-20 오전에 잠깐 있었다.
+  **storage 테이블은 SQL로 지울 수 없으므로**(`storage.protect_delete`가 막는다)
+  버킷을 없애는 것은 대시보드나 Storage API로만 된다. 마이그레이션으로 지우려 하지 말 것.
+- **승인은 `scripts/approve-submission.mjs`로 한다.** 파일 이동은 Postgres가 못 하기
+  때문이다(`storage.objects`의 name만 바꾸면 실제 오브젝트와 어긋난다). 스크립트가
+  경로를 옮기고 `places.photos`에 붙인 뒤 승인 함수를 부른다 — **순서가 중요하다.**
+
+  ```bash
+  node --env-file=.env.local scripts/approve-submission.mjs report <report-id> <place-id>
+  node --env-file=.env.local scripts/approve-submission.mjs edit   <request-id>
+  ```
+
+  `SUPABASE_SERVICE_ROLE_KEY`가 `.env.local`에 있어야 한다. **`NEXT_PUBLIC_` 접두사를
+  붙이지 않는다** — 붙이면 브라우저 번들에 실려 나간다.
+- **버려진 사진 정리는 두 겹이다.**
+  1. **앱이 그 자리에서 되돌린다** — `lib/submissions.ts`의 `removePhotos()`. 사진은
+     제출 버튼을 누를 때 올라가고 insert가 그 뒤에 오므로, 중간에 실패하면(중복 제보,
+     업로드 도중 실패) 방금 올린 것을 지운다. storage 정책이 `submissions/<본인 uid>/`에
+     delete를 열어 두어 **사용자 세션만으로 된다** — 운영자 키가 필요 없다.
+     지우기에 실패해도 **던지지 않는다.** 던지면 사용자가 알아야 할 원래 실패를 덮는다.
+  2. **놓친 것은 스크립트가 걷어간다** — `scripts/prune-orphan-photos.mjs`. 탭을 닫거나
+     네트워크가 끊겨 1번이 못 돈 경우의 안전망이다.
+
+  ```bash
+  node --env-file=.env.local scripts/prune-orphan-photos.mjs        # 목록만
+  node --env-file=.env.local scripts/prune-orphan-photos.mjs --yes  # 지운다
+  ```
+
+  참조되는 파일은 건드리지 않고, 올라온 지 60분이 안 된 파일도 남긴다(폼이 열려 있을
+  수 있다). **storage 테이블은 SQL로 못 지우므로**(`storage.protect_delete`) 이 경로나
+  대시보드뿐이다.
 
 ### 카카오맵 SDK 통합
 
@@ -244,7 +343,7 @@ alter table public.<table> enable row level security;
 
 - **소유자 컬럼이 있으면 `auth.uid()`와 맞춰 본인 row만 허용한다.** 이 저장소의 소유자
   컬럼 이름은 `user_id`가 아니라 테이블마다 다르다 — `profiles.id`,
-  `place_submissions.submitted_by`. 이름을 가정하지 말고 스키마를 먼저 본다.
+  `place_reports.submitted_by`, `bookmarks.user_id`. 이름을 가정하지 말고 스키마를 먼저 본다.
 - **`auth.uid()`는 `(select auth.uid())`로 감싼다.** 감싸야 플래너가 행마다가 아니라
   구문당 한 번 평가한다. 기존 정책이 전부 이 형태이므로 새 정책도 맞춘다.
 - **정책 안에서 같은 테이블을 select하면 RLS가 재귀한다.** `profiles.role`을 보는 판정은

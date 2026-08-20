@@ -8,7 +8,10 @@
 | 파일 | 내용 |
 |---|---|
 | `supabase/migrations/20260814000001_places.sql` | enum, `places`, 인덱스, 공개 조회 RLS |
-| `supabase/migrations/20260814000002_profiles_and_submissions.sql` | `profiles`, `place_submissions`, 승인/반려 함수, RLS |
+| `supabase/migrations/20260814000002_profiles_and_submissions.sql` | `profiles`, (옛) `place_submissions`, RLS |
+| `supabase/migrations/20260820115447_split_submissions.sql` | 제보를 `place_reports` · `place_edit_requests` 둘로 가름 |
+| `supabase/migrations/20260820121425_place_photos_as_paths.sql` | `places.photos`를 절대 URL → 버킷 경로로 |
+| `supabase/migrations/20260820121437_submission_photos_public.sql` | 제보 사진도 `place-images` 버킷으로, 컬럼명 `photos`로 통일 |
 | `supabase/migrations/20260815000001_bookmarks.sql` | `bookmarks`, RLS |
 | `supabase/migrations/20260814000003_seed_places.sql` | 카페 9곳 (`scripts/generate-seed.mjs`로 `data/cafes.json`에서 생성) |
 | `supabase/migrations/20260814000004_places_photos.sql` | `places.photos` 추가 |
@@ -47,8 +50,8 @@ export async function getCafes(): Promise<Cafe[]> {
 앱 쪽 `data/cafes.json`·`lib/cafes.ts`·`types/cafe.ts`는 그대로 두었다 — 컬럼 이름이
 `Cafe` 인터페이스와 일치하므로 바뀌는 것은 `.from('places')` 한 줄뿐이다.
 
-신고는 별도 테이블 없이 `place_submissions`의 `kind='closed'`로 처리한다. 폐업 신고와
-정보 수정 제보는 검수 흐름이 같아서 테이블을 나눌 이유가 없었다.
+제보는 **테이블 둘로 나뉜다** — `place_reports`(새 장소)와 `place_edit_requests`(정보 수정).
+2026-08-20 이전에는 `place_submissions` 하나가 `kind`로 겸했다. 아래 UGC 절 참고.
 
 ---
 
@@ -73,26 +76,43 @@ export async function getCafes(): Promise<Cafe[]> {
 | `last_verified` `verified_by` | `date` / `uuid` | 신선도 노출 (mvp-decisions 2-3) |
 | `created_by` `created_at` `updated_at` | | `updated_at`은 트리거 |
 
-### `photos` — 저작권 결정을 다시 연 컬럼
+### `photos` — 버킷 경로 하나로 통일
 
-`mvp-decisions.md` 3절은 원래 **"사진은 넣지 않는다 (저작권)"** 를 결정으로 두고 상세를
-`naver_place_url`로 넘겼다. 2026-08-14에 그 결정을 뒤집고, Supabase Storage
-`place-images` 버킷(public)에 직접 호스팅하기로 했다. 값은
-`20260814100834_place_photos_from_storage.sql`이 파일명을 slug에 맞춰 채웠다.
+**카페와 관련된 이미지는 전부 `place-images` 버킷을 쓴다.** 외부 CDN 이미지는 화면에
+얹지 않는다 — 카카오맵 응답 URL을 저장하지 않는다는 결정(크롤링 금지)과 저작권을
+확인한 사진만 쓴다는 결정이 여기 걸려 있다.
 
-⚠️ **지금 들어 있는 9장은 연습용 임시 이미지이며 이용 권리를 확인하지 않았다.**
-습작 범위를 넘겨 공개하려면 교체해야 한다.
+컬럼에는 **경로만** 담는다.
 
-채울 때 지켜야 하는 것:
+```
+photos = {naruteo.jpeg}
+       ↑ https://<ref>.supabase.co/storage/v1/object/public/place-images/... 가 아니다
+```
 
-- 카카오맵 API 응답에서 온 URL을 넣지 않는다. 응답 데이터의 별도 저장은 약관 위반이고
-  차단이 실제로 집행된다 (`mvp-decisions.md` 크롤링 금지).
-- `places_photos_https` check가 `https://` 로 시작하는 URL 목록만 받는다. URL에
-  인코딩되지 않은 공백이 올 수 없다는 점을 이용해 배열을 한 줄로 이어 붙여 검사한다.
+- 절대 URL을 담으면 **프로젝트 ref가 데이터에 박힌다.** 프로젝트를 옮기면 9행을 전부
+  다시 써야 하고 그때까지 화면은 죽은 URL을 가리킨다. 다른 곳은 전부
+  `NEXT_PUBLIC_SUPABASE_URL` 하나만 본다(`next.config.ts`의 remotePatterns까지).
+- 공개 URL 조립은 앱의 `lib/place-images.ts` 한 곳에서만 한다. `toCafe()`가 그것을
+  불러 `Cafe.photos`를 URL로 만들므로 컴포넌트는 버킷을 모른다.
+- check 제약(`places_photos_paths`)이 `://`·공백·빈 문자열을 막는다. 배열을 **빈
+  구분자로** 이어붙여 검사하는 이유는, 공백으로 이어붙이면 원소 안의 공백과 구분자를
+  구별할 수 없기 때문이다(20260820122100).
+- ⚠️ 지금 올라간 9장은 연습용 임시본이며 이용 권리를 확인하지 않았다. 공개 배포 전에
+  직접 촬영본이나 사용 허가를 받은 사진으로 교체해야 한다.
 
-앱은 `COLUMNS`로 이 컬럼을 읽는다. 첫 장이 마커 썸네일, 전체가 상세 패널의 슬라이드다.
-`next.config.ts`의 `images.remotePatterns`가 이 버킷 호스트를 열어준다 — 없으면
-`next/image`가 400으로 막는다.
+경로가 곧 상태다.
+
+| 경로 | 뜻 | 쓸 수 있는 주체 |
+|---|---|---|
+| `submissions/<uid>/<uuid>.jpg` | 검수 전 제보 사진 | 본인 (storage 정책) |
+| `<slug>/<uuid>.jpg` | 승인된 카페 사진 | `service_role` 스크립트 |
+
+DB에 적히는 모양은 테이블마다 다르다. `places.photos`는 위 경로를, 제보 두 테이블은
+그 경로의 **공개 URL**을 담는다.
+
+사진은 제출할 때 올라가고 insert가 그 뒤에 온다. 그 사이에 실패하면 앱이 방금 올린
+파일을 그 자리에서 지우고(`removePhotos()`, 본인 폴더라 세션만으로 된다), 놓친 것은
+`scripts/prune-orphan-photos.mjs`가 나중에 걷어간다.
 
 ### 판단이 갈렸던 지점
 
@@ -121,18 +141,77 @@ DB 제약으로 박아둔 것이다. 속성이 빈 제보는 자동으로 `draft
 
 ---
 
-## `profiles` · `place_submissions` (UGC)
-
-1차 범위 밖이지만(scope.md), 나중에 붙일 자리를 미리 파둔 것이다. **이 테이블들이
-비어 있어도 조회 전용 1차 구현은 그대로 동작한다.**
+## `profiles` · 제보 두 테이블 (UGC)
 
 - `profiles`: `auth.users` 미러. `role`은 `user/curator/admin`이고 가입 시 트리거로 자동 생성된다. 본인은 자기 `role`을 못 올린다.
-- `place_submissions`: 제보 한 건. `kind`는 `new`(신규) / `edit`(수정) / `closed`(폐업 신고).
-  - **제안 값은 `payload jsonb`에 담는다.** `places`의 15개 컬럼을 nullable로 복제하면 두 스키마가 반드시 어긋난다. 대신 `id`·`status`·`created_by` 같은 키는 check 제약으로 payload에서 금지했다.
-  - 같은 사람이 같은 카페에 대기 중 제보를 중복으로 쌓지 못하게 부분 unique 인덱스를 걸었다.
-  - `kind='new'`는 **대기 중일 때만** 대상 카페가 없다. 승인되면 그때 생성된 카페를 가리키도록 `place_id`를 채우므로, 제약을 "대기 중"으로 한정했다.
-- `approve_submission(uuid)`: 반영과 상태 변경을 한 트랜잭션에서 처리한다. `jsonb_populate_record`로 기존 행 위에 payload를 덮으므로 부분 수정이 자연스럽게 된다. **승인 = 운영자가 확인한 것**이므로 `last_verified`를 오늘로 갱신한다.
-- `reject_submission(uuid, text)`: 반려 + 사유.
+
+### 왜 테이블이 둘인가
+
+2026-08-20 이전에는 `place_submissions` 하나가 `kind`(`new`/`edit`/`closed`)로 셋을 겸했다.
+문제는 **셋의 필수 항목이 서로 달랐다는 것**이다. 신규 제보에는 네이버 URL이, 수정
+요청에는 대상 카페가 반드시 있어야 하는데 한 테이블에 두면 둘 다 nullable이 된다.
+공통 컬럼이 `payload jsonb` 하나뿐이었던 것도 그래서다 — 무엇이 들어올 수 있는지가
+스키마가 아니라 앱 코드에만 있었다.
+
+| 테이블 | 담는 것 | not null |
+|---|---|---|
+| `place_reports` | 새 장소 제보 | `naver_place_url` |
+| `place_edit_requests` | 기존 장소 수정 요청 | `place_id` |
+
+공통점도 있다. 둘 다 `submitted_by`·`photos`·`note`·`status`·`reviewed_*`를 갖고,
+RLS 정책과 "같은 사람이 같은 대상에 대기 중 요청 하나"(부분 unique 인덱스)도 같다.
+
+- **`photos text[]`는 `place-images` 버킷의 공개 URL이다.** `places.photos`가 경로를
+  담는 것과 다르다 — **검수자가 대시보드에서 값을 그대로 클릭해 사진을 열 수 있어야**
+  하기 때문이다. 제보는 검수가 끝나면 수명이 끝나는 데이터라 URL에 프로젝트 ref가
+  박히는 대가를 치를 만하다.
+  check 제약이 `place-images` 공개 객체 URL 모양을 강제하므로 외부 CDN 이미지도,
+  경로만 적은 값도 거부된다. 파일은 검수 전 `submissions/<uid>/` 아래에 있고, 승인되면
+  같은 버킷의 `<slug>/`로 옮겨가면서 `places.photos`에는 **경로로** 붙는다.
+- `place_reports.place_id`는 **승인된 뒤에만** 값을 갖는다. 대기 중에는 아직 카페가 없고
+  (`place_reports_pending_has_no_place`), 승인은 곧 "이 카페로 등록했다"이므로 비어 있을
+  수 없다(`place_reports_approved_has_place`).
+- `place_edit_requests`에는 `has_content` 제약이 있다. 사진도 메모도 없는 요청은 검수하는
+  사람이 열어봐야만 빈 것을 알 수 있다.
+- **둘 다 `DELETE` 정책이 없다.** 보낸 사람이 지우면 검수 이력이 사라지고, 큐레이터에게는
+  반려가 있다. 정책 없는 명령은 거부되므로 delete는 전부 막힌 상태다. 의도한 것이다.
+
+### 승인 · 반려
+
+**함수가 카페를 만들지도 고치지도 않는다.** 두 테이블 어느 쪽도 `places`를 채울 만큼의
+정보를 담지 않기 때문이다. 옛 `approve_submission()`은 `jsonb_populate_record`로 payload를
+`places`에 부었는데, 그 payload는 사실 운영자가 승인 직전에 손으로 채운 값이었다 —
+사용자가 보내지 않은 것을 사용자가 보낸 것처럼 다루는 구조였다.
+
+**사진이 붙은 제보는 스크립트로 승인한다.** 파일 이동은 Postgres가 못 하기 때문이다
+(`storage.objects`의 name만 바꾸면 실제 오브젝트와 어긋난다).
+
+```bash
+node --env-file=.env.local scripts/approve-submission.mjs report <report-id> <place-id>
+node --env-file=.env.local scripts/approve-submission.mjs edit   <request-id>
+```
+
+스크립트가 사진을 `<slug>/`로 옮기고 `places.photos`에 붙인 뒤 아래 함수를 부른다.
+`SUPABASE_SERVICE_ROLE_KEY`가 필요하다.
+
+```sql
+-- 새 장소 제보: 큐레이터가 카페를 먼저 만들고, 그 카페에 제보를 연결한다
+insert into public.places (name, address, lat, lng, is_24h, open_time, close_time,
+                           naver_place_url, outlet, wifi, noise, work_fit,
+                           status, last_verified, verified_by)
+values ('...', '...', 37.5, 127.1, false, '10:00', '22:00',
+        '<제보의 naver_place_url>', 'many', true, 'quiet', 'good',
+        'published', current_date, auth.uid())
+returning id;
+
+select public.approve_place_report('<report id>', '<방금 만든 place id>');
+
+-- 정보 수정 요청: places를 직접 고친 뒤
+select public.approve_edit_request('<request id>');   -- last_verified를 오늘로 옮긴다
+```
+
+- `reject_place_report(uuid, text)` / `reject_edit_request(uuid, text)`: 반려 + 사유.
+- 넷 다 `security definer`이고 `is_curator()`로 먼저 막는다. `authenticated`에만 grant.
 
 ---
 
@@ -154,7 +233,7 @@ primary key (user_id, place_id)
   `slug`는 nullable이라(제보로 등록돼 큐레이터가 아직 붙이지 않은 카페) 참조 무결성을
   주지 못한다. slug ↔ uuid 변환은 `lib/bookmarks.ts`가 맡는다.
 - **소유자 컬럼 이름은 `user_id`다.** 이 저장소는 테이블마다 다르다 —
-  `profiles.id`, `place_submissions.submitted_by`, `bookmarks.user_id`.
+  `profiles.id`, `place_reports.submitted_by`, `bookmarks.user_id`.
 - 저장해 둔 카페가 `draft`·`hidden`·`closed`로 바뀌면 `places` RLS가 그 행을 감춘다.
   목록에서는 빠지지만 북마크는 남는다. 다시 `published`가 되면 되살아난다.
 
@@ -164,11 +243,43 @@ primary key (user_id, place_id)
 |---|---|---|---|
 | `places` | `published`만 select | 동일 | 전체 select·insert·update |
 | `profiles` | select | 본인 update (role 제외) | — |
-| `place_submissions` | 접근 불가 | 본인 것 insert·select, pending일 때 update | 전체 + 승인/반려 |
+| `place_reports` | 접근 불가 | 본인 것 insert·select, pending일 때 update | 전체 + 승인/반려 |
+| `place_edit_requests` | 접근 불가 | 본인 것 insert·select, pending일 때 update | 전체 + 승인/반려 |
 | `bookmarks` | 접근 불가 | 본인 것 select·insert·delete | 예외 없음 (본인 것만) |
+| `place_reviews` | 접근 불가 (집계 함수만) | 본인 것 select·insert·update·delete | 예외 없음 (본인 것만) |
+| `storage.objects` (`place-images`) | 공개 URL로 읽기 | `submissions/<본인 uid>/`에 insert·delete | 예외 없음 (스크립트는 `service_role`) |
 
 카페 데이터 쓰기는 큐레이터 정책 또는 `service_role`(서버 전용 키)로만 가능하다.
 `NEXT_PUBLIC_` anon 키로는 어떤 카페도 수정할 수 없다.
+
+**`place_reviews`는 집계만 밖으로 나간다.** 테이블 자체는 본인 행만 보이고, 화면이 쓰는
+"좋아요 3 · 보통 1 · 별로 0"은 `place_review_counts(uuid)` `security definer` 함수가 낸다
+(`anon`·`authenticated`에 execute grant). 테이블을 열어 집계를 만들게 하면 누가 어디에
+`bad`를 눌렀는지가 통째로 따라 나온다. **큐레이터도 남의 평가를 보지 못한다** — 운영에
+필요한 정보가 아니다.
+
+**`place_reviews`에는 `bookmarks`와 달리 `UPDATE` 정책이 있다.** 고칠 값(`value`)이 있기
+때문이고, `using`과 `with check`를 함께 걸어 본인 행의 주인을 남에게 넘기지 못하게 막는다.
+
+**버킷은 `place-images` 하나다.** 2026-08-20에 비공개 `submission-images`를 두었다가
+같은 날 접었다 — 카페 이미지는 전부 한 버킷을 쓰고 컬럼 모양도 같아야 한다는 결정이다.
+그 버킷을 만들던 마이그레이션(20260820113058)은 내용을 비워 두었다. **버킷 삭제 자체는
+SQL로 못 한다** — `storage.protect_delete` 트리거가 storage 테이블 직접 삭제를 막으므로
+대시보드나 Storage API를 쓴다.
+
+- 대가: **검수 전 사진도 URL을 알면 열린다.** 파일명이 uuid라 추측은 어렵지만 인증이
+  필요하지 않다는 뜻이다.
+- 방어선 둘: 사용자는 `submissions/<본인 uid>/` 아래에만 쓸 수 있고, 버킷에 5MB·
+  이미지 3종 제한이 걸려 있다. **카페 사진 자리(`<slug>/`)에는 직접 못 쓴다.**
+- `SELECT` 정책은 만들지 않았다. 공개 버킷이라 읽기는 정책이 아니라 공개 URL로
+  이뤄진다 — 정책을 만들면 통제하고 있다는 인상만 준다.
+- `UPDATE` 정책도 없다(파일마다 새 uuid를 쓰므로 덮어쓸 일이 없다).
+- **모든 정책에 `bucket_id` 조건이 함께 걸려 있다** — 빼면 모든 버킷에 적용된다.
+
+⚠️ storage 마이그레이션에서 `alter table storage.objects enable row level security`와
+`grant`를 쓰지 않는다. RLS는 이미 켜져 있고 `authenticated` grant도 이미 있으며,
+`alter table`은 소유자(`supabase_storage_admin`)만 실행할 수 있어 거기서 깨진다.
+`create policy`와 버킷 insert는 `postgres`로 통과한다 (2026-08-20 실측).
 
 **`bookmarks`에는 `UPDATE` 정책이 없다. 일부러다.** 고칠 값이 없는 테이블이라
 (`user_id`·`place_id`는 PK, `created_at`은 기록) 해제는 `delete`로 한다. 정책이 없는
@@ -204,10 +315,13 @@ supabase db push          # 스키마 + 카페 9곳 + 북마크
 | `places_hours_required`, 시간 정규식, 좌표 범위 | 통과 |
 | `naver_place_url` 중복 등록 차단 | 통과 |
 | 가입 시 `profiles` 자동 생성, 본인 `role` 승격 차단 | 통과 |
-| 제보 신규 등록 → 승인 (비큐레이터 승인 거부 포함) | 통과 |
-| 제보 부분 수정 (payload에 있는 키만 반영) | 통과 |
-| payload 금지 키 차단, 반려 흐름 | 통과 |
-| 남의 제보는 조회 불가, 큐레이터는 전체 조회 | 통과 |
+| 새 장소 제보 → 승인, 등록된 카페와 연결 (비큐레이터 승인 거부 포함) | 통과 |
+| 수정 요청 → 승인, `last_verified`가 오늘로 이동 | 통과 |
+| `photos`에 URL·공백 차단(세 테이블 공통), 내용 없는 수정 요청 차단 | 통과 |
+| 시드 9곳의 사진이 URL이 아니라 경로로 저장돼 있음 | 통과 |
+| 제보 사진은 `submissions/<본인 uid>/`에만, 카페 사진 자리(`<slug>/`)에는 못 씀 | 통과 |
+| 대기 중 요청은 대상당 하나 (부분 unique 인덱스) | 통과 |
+| 남의 제보는 조회 불가, 남의 이름으로 제보 불가, 자가 승인 불가, delete 0건 | 통과 |
 | `updated_at` 트리거, `"HH:mm"` 형식 유지 | 통과 |
 | 북마크: 본인 것만 조회, anon은 0건, 큐레이터도 남의 것 못 봄 | 통과 |
 | 북마크: 남의 uid로 insert 차단, 남의 행 delete 0건, 본인 것 delete 1건 | 통과 |
