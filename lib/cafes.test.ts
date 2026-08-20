@@ -40,7 +40,7 @@ describe('toCafe', () => {
       wifi: false,
       noise: 'normal',
       work_fit: 'ok',
-      photos: ['https://example.test/a.jpg'],
+      photos: ['naruteo.jpeg'],
       tags: ['창가석', '넓은 테이블'],
       last_verified: '2026-08-15',
     });
@@ -56,10 +56,25 @@ describe('toCafe', () => {
       wifi: false,
       noise: 'normal',
       work_fit: 'ok',
-      photos: ['https://example.test/a.jpg'],
+      // DB의 경로가 그대로 오지 않는다 — 아래 테스트가 그 변환을 본다
       tags: ['창가석', '넓은 테이블'],
       last_verified: '2026-08-15',
     });
+  });
+
+  it('사진 경로를 버킷 공개 URL로 바꾼다', () => {
+    // DB에는 경로만 담는다. 프로젝트 ref가 데이터에 박히지 않게 하려는 것이고,
+    // 그래서 URL 조립은 lib/place-images.ts 한 곳에서만 일어난다.
+    const cafe = toCafe(makePlaceRow({ photos: ['naruteo.jpeg', 'submissions/uid/b.jpg'] }));
+
+    expect(cafe.photos).toEqual([
+      'http://localhost:54321/storage/v1/object/public/place-images/naruteo.jpeg',
+      'http://localhost:54321/storage/v1/object/public/place-images/submissions/uid/b.jpg',
+    ]);
+  });
+
+  it('사진이 없으면 빈 배열 그대로 둔다', () => {
+    expect(toCafe(makePlaceRow({ photos: [] })).photos).toEqual([]);
   });
 
   it('가격이 확인되지 않은 카페는 null을 유지한다', () => {

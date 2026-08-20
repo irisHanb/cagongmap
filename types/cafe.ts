@@ -22,7 +22,12 @@ export interface Cafe {
   wifi: boolean;
   noise: NoiseLevel;
   work_fit: WorkFit;
-  /** 사진 URL 목록. 없는 카페는 빈 배열 — 화면은 빈 상태로 처리한다 */
+  /**
+   * 바로 렌더할 수 있는 사진 URL 목록. 없는 카페는 빈 배열 — 화면은 빈 상태로 처리한다.
+   *
+   * DB에는 place-images 버킷의 경로로 담겨 있고, toCafe()가 공개 URL로 바꿔 준다
+   * (lib/place-images.ts). 외부 CDN 이미지는 여기에 오지 않는다.
+   */
   photos: string[];
   tags: string[];
   /** "YYYY-MM-DD" — 신선도 표시용 */

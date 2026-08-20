@@ -1,3 +1,4 @@
+import { placeImageUrl } from '@/lib/place-images';
 import { supabase } from '@/lib/supabase';
 import type { Cafe, NoiseLevel, OutletLevel, WorkFit } from '@/types/cafe';
 
@@ -48,6 +49,7 @@ export interface PlaceRow {
   wifi: boolean;
   noise: NoiseLevel;
   work_fit: WorkFit;
+  /** place-images 버킷의 오브젝트 경로. URL이 아니다 */
   photos: string[];
   tags: string[];
   last_verified: string;
@@ -72,8 +74,10 @@ export function toCafe(row: PlaceRow): Cafe {
     wifi: row.wifi,
     noise: row.noise,
     work_fit: row.work_fit,
-    // not null + default '{}'이라 null로 올 일이 없다 (20260814000004_places_photos.sql)
-    photos: row.photos,
+    // DB에는 버킷 경로가, Cafe에는 바로 렌더할 수 있는 공개 URL이 담긴다.
+    // 변환을 여기서 하는 덕분에 컴포넌트는 사진이 어느 버킷에서 오는지 모른다
+    // — 이 이음매를 열어둔 이유가 그것이다 (lib/place-images.ts).
+    photos: row.photos.map(placeImageUrl),
     tags: row.tags,
     last_verified: row.last_verified,
   };
@@ -107,6 +111,32 @@ export async function getCafeById(id: string): Promise<Cafe | undefined> {
 
   if (error) {
     throw new Error(`카페를 불러오지 못했습니다 (${id}): ${error.message}`);
+  }
+
+  return data ? toCafe(data) : undefined;
+}
+
+/**
+ * 네이버 플레이스 URL로 이미 등록된 카페를 찾는다.
+ *
+ * 신규 제보에서만 쓴다. places_naver_place_url_key가 같은 URL을 두 번 등록하지
+ * 못하게 막고 있어서, 이 조회를 건너뛰면 사용자는 제보가 접수된 줄 알았다가
+ * 승인 시점에 조용히 버려진다.
+ *
+ * published만 보므로 검수 대기 중인 draft 카페는 걸러내지 못한다. 그쪽까지
+ * 잡으려면 anon에게 draft를 열어야 하는데, 그것이 더 큰 대가다.
+ */
+export async function getCafeByNaverUrl(url: string): Promise<Cafe | undefined> {
+  const { data, error } = await supabase
+    .from('places')
+    .select(PLACE_COLUMNS)
+    .eq('status', 'published')
+    .eq('naver_place_url', url)
+    .returns<PlaceRow[]>()
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`카페를 확인하지 못했습니다: ${error.message}`);
   }
 
   return data ? toCafe(data) : undefined;

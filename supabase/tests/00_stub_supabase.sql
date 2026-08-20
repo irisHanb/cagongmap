@@ -36,3 +36,45 @@ alter default privileges in schema public
   grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public
   grant all on functions to anon, authenticated, service_role;
+
+-- ─── storage 스텁 ───────────────────────────────────────────────────────────
+--  Supabase Storage가 만드는 스키마를 정책 검증에 필요한 만큼만 흉내 낸다.
+--  실제 컬럼은 훨씬 많지만(owner, metadata, version, …) 정책이 보는 것은
+--  bucket_id와 name뿐이라 그 둘과 PK만 둔다.
+--
+--  실제 프로젝트에서는 storage.objects의 RLS가 이미 켜져 있고 소유자가
+--  supabase_storage_admin이다. 여기서는 postgres가 만들고 직접 켠다 — 그래서
+--  마이그레이션은 `alter table ... enable row level security`를 부르면 안 된다.
+--  (실제 프로젝트에서 그 문장은 권한 오류로 깨진다)
+
+create schema if not exists storage;
+
+create table storage.buckets (
+  id                 text  primary key,
+  name               text  not null,
+  public             boolean not null default false,
+  file_size_limit    bigint,
+  allowed_mime_types text[],
+  created_at         timestamptz not null default now()
+);
+
+create table storage.objects (
+  id         uuid  primary key default gen_random_uuid(),
+  bucket_id  text  references storage.buckets(id),
+  name       text,
+  owner      uuid,
+  created_at timestamptz not null default now()
+);
+
+-- 'uid/파일.jpg' → {uid, 파일.jpg}. 실제 구현과 같은 시그니처다.
+create or replace function storage.foldername(name text)
+returns text[] language sql immutable as $$
+  select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1];
+$$;
+
+alter table storage.objects enable row level security;
+alter table storage.buckets enable row level security;
+
+grant usage on schema storage to anon, authenticated, service_role;
+grant select, insert, update, delete on storage.objects  to anon, authenticated, service_role;
+grant select, insert, update, delete on storage.buckets  to anon, authenticated, service_role;

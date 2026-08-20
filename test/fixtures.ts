@@ -34,7 +34,12 @@ export function makeCafe(overrides: Partial<Cafe> = {}): Cafe {
   };
 }
 
-/** places 테이블 한 행. toCafe()에 넣을 입력이다. */
+/**
+ * places 테이블 한 행. toCafe()에 넣을 입력이다.
+ *
+ * photos는 **버킷 경로**다(`naruteo.jpeg`). Cafe.photos는 toCafe()가 만든 공개
+ * URL이므로 둘의 모양이 다르다 — 그 변환이 lib/cafes.test.ts의 검증 대상이다.
+ */
 export function makePlaceRow(overrides: Partial<PlaceRow> = {}): PlaceRow {
   return {
     id: '11111111-2222-3333-4444-555555555555',

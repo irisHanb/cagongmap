@@ -1,5 +1,6 @@
 import type { Cafe } from '@/types/cafe';
 import { PLACE_COLUMNS, toCafe, type PlaceRow } from '@/lib/cafes';
+import { resolvePlaceId } from '@/lib/place-id';
 import { getBrowserSupabase } from '@/lib/supabase-browser';
 
 /**
@@ -13,37 +14,6 @@ import { getBrowserSupabase } from '@/lib/supabase-browser';
  *
  * places row → Cafe 변환은 lib/cafes.ts의 toCafe()를 그대로 빌려 쓴다.
  */
-
-/** Cafe.id는 slug다. slug가 없는 카페만 uuid가 그대로 들어온다 (lib/cafes.ts toCafe) */
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/**
- * 앱 키(slug) → places.id(uuid).
- *
- * bookmarks.place_id가 uuid FK라 저장·해제 때 한 번 변환이 필요하다. slug로 FK를
- * 걸면 이 변환이 없어지지만, slug가 nullable이라 참조 무결성을 못 준다
- * (supabase/migrations/20260815000001_bookmarks.sql 주석 참고).
- *
- * 목록 조회에는 쓰지 않는다 — 그쪽은 join 한 번으로 끝난다.
- */
-async function resolvePlaceId(cafeId: string): Promise<string> {
-  if (UUID_RE.test(cafeId)) return cafeId;
-
-  const { data, error } = await getBrowserSupabase()
-    .from('places')
-    .select('id')
-    .eq('slug', cafeId)
-    .maybeSingle<{ id: string }>();
-
-  if (error) {
-    throw new Error(`카페를 찾지 못했습니다 (${cafeId}): ${error.message}`);
-  }
-  if (!data) {
-    throw new Error(`카페를 찾지 못했습니다: ${cafeId}`);
-  }
-
-  return data.id;
-}
 
 interface BookmarkRow {
   place_id: string;

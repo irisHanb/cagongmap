@@ -49,14 +49,24 @@ begin
 exception when check_violation then raise notice 'OK: lat 범위가 막았다';
 end $$;
 
-\echo '=== 5-1. photos는 https URL 목록만 받는다 ==='
+\echo '=== 5-1. photos는 버킷 경로만 받는다 (URL 금지) ==='
+-- 카페 이미지는 전부 place-images 버킷을 쓴다. URL을 담으면 프로젝트 ref가 데이터에
+-- 박히고, 외부 CDN 이미지가 섞여 들어올 길도 열린다.
 do $$
 begin
   insert into public.places (name, address, lat, lng, is_24h, open_time, close_time, photos)
   values ('사진형식', '서울 송파구 어딘가 5-1', 37.51, 127.10, false, '09:00', '18:00',
-          array['not-a-url']);
-  raise exception 'FAIL: photos 형식이 통과되어 버렸다';
-exception when check_violation then raise notice 'OK: places_photos_https가 막았다';
+          array['https://example.com/a.jpg']);
+  raise exception 'FAIL: URL이 통과되어 버렸다';
+exception when check_violation then raise notice 'OK: places_photos_paths가 막았다';
+end $$;
+do $$
+begin
+  insert into public.places (name, address, lat, lng, is_24h, open_time, close_time, photos)
+  values ('사진공백', '서울 송파구 어딘가 5-1b', 37.51, 127.10, false, '09:00', '18:00',
+          array['a b.jpg']);
+  raise exception 'FAIL: 공백이 통과되어 버렸다';
+exception when check_violation then raise notice 'OK: 공백이 막혔다';
 end $$;
 do $$
 declare
@@ -64,10 +74,16 @@ declare
 begin
   insert into public.places (name, address, lat, lng, is_24h, open_time, close_time, photos)
   values ('사진정상', '서울 송파구 어딘가 5-2', 37.51, 127.10, false, '09:00', '18:00',
-          array['https://example.com/a.jpg', 'https://example.com/b.jpg'])
+          array['naruteo.jpeg', 'submissions/22222222-2222-2222-2222-222222222222/b.jpg'])
   returning photos into v_photos;
   raise notice 'OK: 여러 장 저장됨 (%장)', cardinality(v_photos);
 end $$;
+
+\echo '-- 시드 9곳도 경로로 바뀌어 있어야 한다'
+select count(*) filter (where array_to_string(photos, ' ') like '%://%') as urls_left,
+       min(photos[1]) as sample
+  from public.places
+ where cardinality(photos) > 0;
 
 \echo '=== 6. naver_place_url 중복 등록 방지 ==='
 do $$
@@ -87,68 +103,104 @@ values ('11111111-1111-1111-1111-111111111111', 'curator@test', '{"name":"큐레
 select id, nickname, role from public.profiles order by nickname;
 update public.profiles set role = 'curator' where id = '11111111-1111-1111-1111-111111111111';
 
-\echo '=== 8. 제보: 신규 등록 → 승인 ==='
+\echo '=== 8. 새 장소 제보 → 승인 ==='
 set local test.uid = '22222222-2222-2222-2222-222222222222';
-insert into public.place_submissions (kind, payload, note) values (
-  'new',
-  jsonb_build_object(
-    'name', '테스트 제보 카페', 'address', '서울 송파구 백제고분로 1', 'district', '송파구',
-    'lat', 37.5079, 'lng', 127.1073, 'open_time', '10:00', 'close_time', '22:00',
-    'is_24h', false, 'iced_americano_price', 4500,
-    'outlet', 'many', 'wifi', true, 'noise', 'quiet', 'work_fit', 'good',
-    'tags', jsonb_build_array('콘센트많음', '노트북작업')),
-  '직접 방문해서 확인했습니다');
+insert into public.place_reports (naver_place_url, photos, note)
+values ('https://naver.me/testReport',
+        array['https://test.supabase.co/storage/v1/object/public/place-images/submissions/22222222-2222-2222-2222-222222222222/a.jpg'],
+        '직접 방문해서 확인했습니다');
+
+\echo '-- 큐레이터가 카페를 먼저 만든다 (제보에는 이만한 정보가 없다)'
+set local test.uid = '11111111-1111-1111-1111-111111111111';
+insert into public.places (name, address, district, lat, lng, naver_place_url,
+                           open_time, close_time, is_24h, iced_americano_price,
+                           outlet, wifi, noise, work_fit, tags,
+                           status, last_verified, verified_by)
+values ('테스트 제보 카페', '서울 송파구 백제고분로 1', '송파구', 37.5079, 127.1073,
+        'https://naver.me/testReport', '10:00', '22:00', false, 4500,
+        'many', true, 'quiet', 'good', array['콘센트많음', '노트북작업'],
+        'published', current_date, '11111111-1111-1111-1111-111111111111')
+returning id as new_place_id
+\gset
 
 \echo '-- 제보자는 승인할 수 없어야 한다'
+set local test.uid = '22222222-2222-2222-2222-222222222222';
 do $$
 begin
-  perform public.approve_submission((select id from public.place_submissions limit 1));
+  perform public.approve_place_report(
+    (select id from public.place_reports limit 1),
+    (select id from public.places where naver_place_url = 'https://naver.me/testReport'));
   raise exception 'FAIL: 비큐레이터가 승인했다';
 exception when raise_exception then raise notice 'OK: %', sqlerrm;
 end $$;
 
 set local test.uid = '11111111-1111-1111-1111-111111111111';
-select public.approve_submission(
-         (select id from public.place_submissions where kind = 'new' limit 1)
-       ) as new_place_id
-\gset
-select name,
-       status,
-       last_verified = current_date as verified_today,
-       tags,
-       created_by is not null       as has_reporter
-  from public.places
- where id = :'new_place_id';
+select public.approve_place_report(
+         (select id from public.place_reports limit 1), :'new_place_id');
+\echo '-- 승인되면 제보가 등록된 카페를 가리킨다'
+select status, place_id = :'new_place_id' as linked, reviewed_at is not null as reviewed
+  from public.place_reports;
 
-\echo '=== 9. 제보: 부분 수정 ==='
+\echo '=== 9. 정보 수정 요청 → 승인 ==='
+\echo '-- 확인일을 어제로 돌려놓고 시작한다'
+update public.places set last_verified = current_date - 1 where id = :'new_place_id';
+
 set local test.uid = '22222222-2222-2222-2222-222222222222';
-insert into public.place_submissions (kind, place_id, payload, note)
-values ('edit', :'new_place_id',
-        jsonb_build_object('iced_americano_price', 5000, 'noise', 'normal'),
-        '가격 인상됨');
-set local test.uid = '11111111-1111-1111-1111-111111111111';
-select public.approve_submission(
-         (select id from public.place_submissions where kind = 'edit' limit 1));
-\echo '-- name/tags는 그대로, 가격·소음만 바뀌어야 한다'
-select name, iced_americano_price, noise, tags from public.places where id = :'new_place_id';
+insert into public.place_edit_requests (place_id, note)
+values (:'new_place_id', '가격 인상됨');
 
-\echo '=== 10. payload에 금지 키가 있으면 거부 ==='
+set local test.uid = '11111111-1111-1111-1111-111111111111';
+select public.approve_edit_request(
+         (select id from public.place_edit_requests limit 1));
+\echo '-- 승인은 확인일을 오늘로 옮긴다. 카페 정보 자체는 사람이 고친다'
+select p.name,
+       p.last_verified = current_date as verified_today,
+       r.status
+  from public.places p, public.place_edit_requests r
+ where p.id = :'new_place_id';
+
+\echo '=== 10. 제보 사진은 place-images 공개 URL만 받는다 ==='
+-- places.photos는 경로, 제보 쪽은 URL이다. 담는 목적이 달라서 모양도 다르다.
+-- 어느 쪽이든 외부 CDN 이미지는 들어올 수 없다.
+set local test.uid = '22222222-2222-2222-2222-222222222222';
 do $$
 begin
-  insert into public.place_submissions (kind, payload)
-  values ('new', jsonb_build_object('name', 'x', 'status', 'published'));
-  raise exception 'FAIL: 금지 키가 통과되어 버렸다';
-exception when check_violation then raise notice 'OK: submissions_payload_keys가 막았다';
+  insert into public.place_reports (naver_place_url, photos)
+  values ('https://naver.me/withUrlPhoto',
+          array['https://example.com/photo.jpg']);
+  raise exception 'FAIL: 외부 URL이 들어갔다';
+exception when check_violation then raise notice 'OK: place_reports_photos_urls가 막았다';
+end $$;
+do $$
+begin
+  insert into public.place_reports (naver_place_url, photos)
+  values ('https://naver.me/withPathPhoto',
+          array['submissions/22222222-2222-2222-2222-222222222222/a.jpg']);
+  raise exception 'FAIL: 경로가 들어갔다 (URL이어야 한다)';
+exception when check_violation then raise notice 'OK: 경로는 거부됐다';
 end $$;
 
-\echo '=== 11. 폐업 신고 ==='
-set local test.uid = '22222222-2222-2222-2222-222222222222';
-insert into public.place_submissions (kind, place_id, payload, note)
-values ('closed', :'new_place_id', '{}'::jsonb, '문 닫았습니다');
-set local test.uid = '11111111-1111-1111-1111-111111111111';
-select public.reject_submission(
-  (select id from public.place_submissions where kind = 'closed' limit 1), '확인 필요');
-select kind, status, review_note from public.place_submissions order by created_at;
+\echo '-- 내용 없는 수정 요청도 거부된다'
+do $$
+begin
+  insert into public.place_edit_requests (place_id, note)
+  values ((select id from public.places limit 1), '   ');
+  raise exception 'FAIL: 빈 수정 요청이 들어갔다';
+exception when check_violation then raise notice 'OK: has_content 제약이 막았다';
+end $$;
+
+\echo '=== 11. 같은 대상에 대기 중 요청은 하나뿐 ==='
+-- 9번에서 낸 요청은 승인됐으므로(부분 인덱스는 pending만 본다) 새로 하나 낸다.
+insert into public.place_edit_requests (place_id, note)
+values (:'new_place_id', '대기 중인 요청');
+do $$
+begin
+  insert into public.place_edit_requests (place_id, note)
+  values ((select id from public.places
+            where naver_place_url = 'https://naver.me/testReport'), '또 보냅니다');
+  raise exception 'FAIL: 대기 중 요청이 두 건 쌓였다';
+exception when unique_violation then raise notice 'OK: 부분 unique 인덱스가 막았다';
+end $$;
 
 \echo '=== 12. updated_at 트리거 ==='
 select updated_at > created_at as updated_at_moved from public.places where id = :'new_place_id';
