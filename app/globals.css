@@ -882,3 +882,329 @@ a {
     transition: none;
   }
 }
+
+/* ---------------------------------------------------------------
+   리뷰 — DESIGN.md Detail Panel 7번
+   상세 안에서 Quick Check(사실)와 갈라 두는 것이 핵심이라, 구분선을
+   위에 두고 한 칸 띄운다.
+   --------------------------------------------------------------- */
+
+.review {
+  margin-top: var(--sp-lg);
+  padding-top: var(--sp-md);
+  border-top: 1px solid var(--outline-variant);
+}
+
+.review__choices {
+  display: flex;
+  gap: var(--sp-sm);
+  margin-top: var(--sp-sm);
+  list-style: none;
+}
+
+.review__choices li {
+  flex: 1;
+}
+
+.review-chip {
+  width: 100%;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--r-full);
+  background: var(--surface-container-lowest);
+  color: var(--on-surface-variant);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.review-chip:hover {
+  background: var(--surface-container);
+  color: var(--on-surface);
+}
+
+/* 색이 드는 것은 좋은 조건뿐이다 (DESIGN.md). good만 민트를 갖고
+   normal·bad는 선택돼도 무채색으로 눕는다 — 부정 상태에 색을 주지 않는다. */
+.review-chip--on {
+  border-color: transparent;
+  background: var(--surface-container-high);
+  color: var(--on-surface);
+}
+
+.review-chip--good.review-chip--on {
+  background: var(--pastel-mint);
+  color: var(--positive-text);
+}
+
+.review__counts {
+  min-height: 16px;
+  margin-top: var(--sp-sm);
+  color: var(--on-surface-variant);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+/* 확인일 아래의 작은 텍스트 버튼. CTA가 아니다 — 상세의 주인공은 카페다. */
+.cafe-panel__edit-request {
+  margin-top: var(--sp-sm);
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--on-surface-variant);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.cafe-panel__edit-request:hover {
+  color: var(--on-surface);
+}
+
+/* ---------------------------------------------------------------
+   제보 — dock 진입점과 폼 모달
+   --------------------------------------------------------------- */
+
+/* 카카오 로그인만 큰 색을 갖는다. 제보는 그 아래 조용한 보조 버튼이다. */
+.dock-action {
+  width: 100%;
+  height: 40px;
+  margin-top: var(--sp-sm);
+  padding: 0;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--r-full);
+  background: var(--surface-container-lowest);
+  color: var(--on-surface-variant);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dock-action:hover {
+  background: var(--surface-container);
+  color: var(--on-surface);
+}
+
+/* 로그인 안내(320px)보다 넓다. 사진 미리보기와 메모가 들어가기 때문이며,
+   그 외 규격(surface·r-panel·shadow-brew)은 로그인 모달과 같다. */
+.modal--form {
+  max-width: 420px;
+  max-height: calc(100dvh - var(--sp-xl));
+  overflow-y: auto;
+}
+
+.submission-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-md);
+}
+
+.field {
+  display: block;
+}
+
+.field__label {
+  display: block;
+  margin-bottom: var(--sp-xs);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+  color: var(--on-surface);
+}
+
+.field__hint {
+  margin-left: var(--sp-xs);
+  color: var(--on-surface-variant);
+  font-weight: 500;
+}
+
+/* 라벨이 span일 때도 블록으로 눕는다 (PhotoPicker는 label이 아니라 span을 쓴다 —
+   진짜 label은 아래 드롭 영역이 갖고 있다) */
+.photo-picker > .field__label {
+  display: block;
+  margin-bottom: var(--sp-xs);
+}
+
+.field__input {
+  width: 100%;
+  height: 48px;
+  padding: 0 var(--sp-md);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--r-full);
+  background: var(--surface-container-lowest);
+  color: var(--on-surface);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.field__input--area {
+  height: auto;
+  padding: var(--sp-sm) var(--sp-md);
+  border-radius: var(--r-md);
+  line-height: 20px;
+  resize: vertical;
+}
+
+.field__input::placeholder {
+  color: var(--outline);
+}
+
+.field__input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+.field__input:disabled {
+  background: var(--surface-container);
+  color: var(--on-surface-variant);
+}
+
+/* 브라우저 기본 파일 입력은 이 화면에서 유일하게 OS 위젯처럼 보인다.
+   숨기되 지우지는 않는다 — 포커스와 키보드 조작은 여전히 이 입력이 받는다. */
+.photo-picker__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 나머지 입력과 같은 규격(48px · pill · outline-variant). 배경만 한 단계 눌러
+   "쓰는 칸"이 아니라 "누르는 자리"로 읽히게 한다. */
+.photo-picker__drop {
+  display: flex;
+  gap: var(--sp-sm);
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--r-full);
+  background: var(--surface-container-low);
+  color: var(--on-surface-variant);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.photo-picker__drop svg {
+  width: 16px;
+  height: 16px;
+}
+
+.photo-picker__drop:hover {
+  background: var(--surface-container);
+  color: var(--on-surface);
+}
+
+/* 드래그가 올라왔을 때. 색을 새로 만들지 않고 primary 테두리만 쓴다 */
+.photo-picker__drop--over {
+  border-color: var(--primary);
+  background: var(--surface-container);
+  color: var(--on-surface);
+}
+
+.photo-picker__input:focus-visible + .photo-picker__drop {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+.photo-picker__input:disabled + .photo-picker__drop {
+  color: var(--outline);
+  cursor: not-allowed;
+}
+
+/* 썸네일의 × 가 위로 6px 튀어나오므로 한 단계 더 띄운다.
+   sp-sm으로 두면 바로 위 버튼에 닿는다. */
+.photo-picker__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-md);
+  margin-top: var(--sp-md);
+  list-style: none;
+}
+
+.photo-picker__item {
+  position: relative;
+  width: 64px;
+  height: 64px;
+}
+
+.photo-picker__item img {
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--r-md);
+  object-fit: cover;
+}
+
+/* 썸네일 모서리에 걸치는 작은 원. 상세의 닫기 버튼과 같은 성격이라
+   같은 무채색을 쓰고 크기만 줄였다. */
+.photo-picker__remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-full);
+  background: var(--on-surface);
+  color: var(--surface-container-lowest);
+  box-shadow: var(--shadow-marker);
+  cursor: pointer;
+}
+
+.photo-picker__remove svg {
+  width: 12px;
+  height: 12px;
+}
+
+.photo-picker__remove:hover {
+  background: var(--primary);
+}
+
+.submission-form__actions {
+  display: flex;
+  flex-direction: column;
+}
+
+.button-primary {
+  width: 100%;
+  height: 48px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-full);
+  background: var(--primary);
+  color: var(--on-primary);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.button-primary:disabled {
+  background: var(--surface-container-high);
+  color: var(--outline);
+  cursor: not-allowed;
+}
+
+/* 실패에 색을 주지 않는다 — 색이 드는 것은 좋은 조건뿐이다 (DESIGN.md).
+   dock의 로그인 실패 문구(.auth-dock__error)와 같은 규격이다. */
+.form-error {
+  margin-top: var(--sp-sm);
+  color: var(--on-surface-variant);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+}

@@ -12,9 +12,9 @@ import { useAuth } from '@/components/auth/AuthProvider';
  * 저장된 카페 목록 하나만 들고, "저장됐는가"와 개수는 거기서 파생시킨다.
  * id Set과 목록을 따로 들면 둘이 어긋나는 순간이 반드시 온다.
  *
- * 로그인하지 않은 사람이 하트를 누르면 여기서 걸러 모달을 띄운다. 판정을 버튼마다
- * 두지 않고 한 곳에 모은 이유는, 나중에 북마크를 누르는 자리가 늘어도 규칙이
- * 한 군데에만 있게 하려는 것이다.
+ * 로그인 판정은 여기 없다. AuthProvider의 requireLogin이 한다 — 2026-08-20에
+ * 리뷰와 제보가 붙으면서 로그인이 필요한 자리가 셋이 됐고, 판정이 셋으로 흩어지면
+ * "로그인 유도는 화면당 하나"(DESIGN.md)를 지킬 수 없다.
  */
 interface BookmarkState {
   cafes: Cafe[];
@@ -23,9 +23,6 @@ interface BookmarkState {
   error: string | null;
   isBookmarked: (cafeId: string) => boolean;
   toggle: (cafe: Cafe) => void;
-  /** 로그인 없이 저장을 시도했는가 — 모달을 띄우는 신호 */
-  loginPrompt: boolean;
-  dismissLoginPrompt: () => void;
 }
 
 const BookmarkContext = createContext<BookmarkState | null>(null);
@@ -52,9 +49,8 @@ interface Loaded {
 }
 
 export default function BookmarkProvider({ children }: { children: ReactNode }) {
-  const { user, resolved: authResolved } = useAuth();
+  const { user, resolved: authResolved, requireLogin } = useAuth();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
-  const [loginPrompt, setLoginPrompt] = useState(false);
 
   useEffect(() => {
     if (!authResolved || !user) return;
@@ -93,10 +89,7 @@ export default function BookmarkProvider({ children }: { children: ReactNode }) 
 
   const toggle = useCallback(
     (cafe: Cafe) => {
-      if (!user) {
-        setLoginPrompt(true);
-        return;
-      }
+      if (!requireLogin('bookmark') || !user) return;
 
       const userId = user.id;
       const saved = cafes.some((c) => c.id === cafe.id);
@@ -117,14 +110,12 @@ export default function BookmarkProvider({ children }: { children: ReactNode }) 
         apply((list) => (saved ? [cafe, ...list] : list.filter((c) => c.id !== cafe.id)), e.message);
       });
     },
-    [user, cafes],
+    [user, cafes, requireLogin],
   );
 
-  const dismissLoginPrompt = useCallback(() => setLoginPrompt(false), []);
-
   const value = useMemo<BookmarkState>(
-    () => ({ cafes, resolved, error, isBookmarked, toggle, loginPrompt, dismissLoginPrompt }),
-    [cafes, resolved, error, isBookmarked, toggle, loginPrompt, dismissLoginPrompt],
+    () => ({ cafes, resolved, error, isBookmarked, toggle }),
+    [cafes, resolved, error, isBookmarked, toggle],
   );
 
   return <BookmarkContext.Provider value={value}>{children}</BookmarkContext.Provider>;

@@ -25,6 +25,18 @@ vi.mock('@/lib/supabase-browser', () => ({
         data: { subscription: { unsubscribe: () => {} } },
       }),
     },
+    // 리뷰 집계는 로그인과 무관하게 조회된다. 로그아웃 상태의 화면을 보려면
+    // 이쪽도 실제 모양대로 답해 줘야 한다 (리뷰 동작 자체는
+    // components/review/ReviewSection.test.tsx가 본다).
+    rpc: async () => ({ data: [{ good: 0, normal: 0, bad: 0 }], error: null }),
+    from: () => {
+      const self: Record<string, unknown> = {
+        select: () => self,
+        eq: () => self,
+        maybeSingle: async () => ({ data: null, error: null }),
+      };
+      return self;
+    },
   }),
 }));
 
@@ -49,7 +61,7 @@ afterEach(() => {
 
 describe('CafeCard', () => {
   it('이름과 주소, 확인일을 보여준다', async () => {
-    renderCard(<CafeCard cafe={makeCafe()} onClose={() => {}} />);
+    renderCard(<CafeCard cafe={makeCafe()} onClose={() => {}} onRequestEdit={() => {}} />);
 
     expect(await screen.findByRole('heading', { name: '나루터' })).toBeInTheDocument();
     expect(screen.getByText('서울 송파구 백제고분로 000')).toBeInTheDocument();
@@ -58,7 +70,7 @@ describe('CafeCard', () => {
   });
 
   it('Quick Check 다섯 항목을 모두 보여준다', async () => {
-    renderCard(<CafeCard cafe={makeCafe()} onClose={() => {}} />);
+    renderCard(<CafeCard cafe={makeCafe()} onClose={() => {}} onRequestEdit={() => {}} />);
 
     await screen.findByRole('heading', { name: '나루터' });
     for (const label of ['콘센트', '소음', '와이파이', '아메리카노', '영업시간']) {
@@ -72,63 +84,73 @@ describe('CafeCard', () => {
 
   it('영업시간 항목이 고정된 현재 시각으로 영업 여부를 말한다', async () => {
     // 15:00이므로 09:00~22:00은 영업중이다.
-    renderCard(<CafeCard cafe={makeCafe()} onClose={() => {}} />);
+    renderCard(<CafeCard cafe={makeCafe()} onClose={() => {}} onRequestEdit={() => {}} />);
     expect(await screen.findByText('영업중 · 09:00 - 22:00')).toBeInTheDocument();
   });
 
   it('영업이 끝난 카페는 영업종료로 적는다', async () => {
     const cafe = makeCafe({ open_time: '07:00', close_time: '11:00' });
-    renderCard(<CafeCard cafe={cafe} onClose={() => {}} />);
+    renderCard(<CafeCard cafe={cafe} onClose={() => {}} onRequestEdit={() => {}} />);
     expect(await screen.findByText('영업종료 · 07:00 - 11:00')).toBeInTheDocument();
   });
 
   it('가격을 확인하지 못한 카페는 0원이 아니라 확인 안 됨으로 적는다', async () => {
-    renderCard(<CafeCard cafe={makeCafe({ iced_americano_price: null })} onClose={() => {}} />);
+    renderCard(<CafeCard cafe={makeCafe({ iced_americano_price: null })} onClose={() => {}} onRequestEdit={() => {}} />);
     expect(await screen.findByText('확인 안 됨')).toBeInTheDocument();
   });
 
   it('사진이 없으면 자리를 없애지 않고 빈 상태를 보여준다', async () => {
-    renderCard(<CafeCard cafe={makeCafe({ photos: [] })} onClose={() => {}} />);
+    renderCard(<CafeCard cafe={makeCafe({ photos: [] })} onClose={() => {}} onRequestEdit={() => {}} />);
     expect(await screen.findByText('등록된 사진이 없습니다')).toBeInTheDocument();
   });
 
   it('지도 링크는 naver_place_url이 있을 때만 나온다', async () => {
-    const { unmount } = renderCard(<CafeCard cafe={makeCafe()} onClose={() => {}} />);
+    const { unmount } = renderCard(<CafeCard cafe={makeCafe()} onClose={() => {}} onRequestEdit={() => {}} />);
     await screen.findByRole('heading', { name: '나루터' });
     expect(screen.queryByRole('link', { name: /지도에서 보기/ })).not.toBeInTheDocument();
     unmount();
 
     const cafe = makeCafe({ naver_place_url: 'https://map.naver.com/p/entry/place/123' });
-    renderCard(<CafeCard cafe={cafe} onClose={() => {}} />);
+    renderCard(<CafeCard cafe={cafe} onClose={() => {}} onRequestEdit={() => {}} />);
     const link = await screen.findByRole('link', { name: /지도에서 보기/ });
     expect(link).toHaveAttribute('href', 'https://map.naver.com/p/entry/place/123');
   });
 
   it('태그를 힌트로 보여주고, 없으면 목록 자체를 그리지 않는다', async () => {
     const { unmount } = renderCard(
-      <CafeCard cafe={makeCafe({ tags: ['창가석', '넓은 테이블'] })} onClose={() => {}} />,
+      <CafeCard cafe={makeCafe({ tags: ['창가석', '넓은 테이블'] })} onClose={() => {}} onRequestEdit={() => {}} />,
     );
     expect(await screen.findByText('창가석')).toBeInTheDocument();
     expect(screen.getByText('넓은 테이블')).toBeInTheDocument();
     unmount();
 
-    renderCard(<CafeCard cafe={makeCafe({ tags: [] })} onClose={() => {}} />);
+    renderCard(<CafeCard cafe={makeCafe({ tags: [] })} onClose={() => {}} onRequestEdit={() => {}} />);
     await screen.findByRole('heading', { name: '나루터' });
     expect(screen.queryByText('창가석')).not.toBeInTheDocument();
   });
 
   it('로그아웃 상태에서도 북마크 하트를 감추지 않는다', async () => {
     // DESIGN.md에서 뒤집은 규칙이다 — 저장할 수 있다는 사실 자체가 로그인의 이유다.
-    renderCard(<CafeCard cafe={makeCafe()} onClose={() => {}} />);
+    renderCard(<CafeCard cafe={makeCafe()} onClose={() => {}} onRequestEdit={() => {}} />);
 
     const heart = await screen.findByRole('button', { name: '나루터 북마크' });
     expect(heart).toHaveAttribute('aria-pressed', 'false');
   });
 
+  it('수정 요청 진입점이 onRequestEdit를 부른다', async () => {
+    // 모달은 MapView가 띄운다. 상세는 "열어달라"고 말하기만 한다.
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const onRequestEdit = vi.fn();
+    renderCard(<CafeCard cafe={makeCafe()} onClose={() => {}} onRequestEdit={onRequestEdit} />);
+
+    await user.click(await screen.findByRole('button', { name: '정보가 다른가요?' }));
+    expect(onRequestEdit).toHaveBeenCalledOnce();
+  });
+
   it('닫기 버튼이 onClose를 부른다', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const onClose = vi.fn();
-    renderCard(<CafeCard cafe={makeCafe()} onClose={onClose} />);
+    renderCard(<CafeCard cafe={makeCafe()} onClose={onClose} onRequestEdit={() => {}} />);
 
     await user.click(await screen.findByRole('button', { name: '닫기' }));
     expect(onClose).toHaveBeenCalledOnce();

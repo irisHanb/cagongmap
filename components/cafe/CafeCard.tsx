@@ -5,6 +5,7 @@ import type { Cafe } from '@/types/cafe';
 import { NOISE_LABEL, OUTLET_LABEL } from '@/types/cafe';
 import { formatBusinessHours, isOpenNow } from '@/lib/openState';
 import BookmarkButton from '@/components/bookmark/BookmarkButton';
+import ReviewSection from '@/components/review/ReviewSection';
 import PhotoCarousel from './PhotoCarousel';
 import {
   HoursIcon,
@@ -17,6 +18,8 @@ import {
 interface CafeCardProps {
   cafe: Cafe;
   onClose: () => void;
+  /** 수정 요청 모달을 연다. 모달 자체는 MapView가 지도 위에 띄운다 */
+  onRequestEdit: () => void;
 }
 
 interface Fact {
@@ -32,7 +35,11 @@ interface Fact {
  * 어느 쪽이든 같은 마크업이고 위치만 CSS가 가른다.
  *
  * 구성 순서는 DESIGN.md를 따른다: 사진 → 주소 → 이름 → 지도 링크 → Quick Check
- * → 힌트. 주소가 이름보다 위에 오는 것은 의도된 순서다.
+ * → 힌트 → 리뷰. 주소가 이름보다 위에 오는 것은 의도된 순서다.
+ *
+ * 리뷰가 Quick Check보다 아래인 이유는 섞이면 안 되기 때문이다. Quick Check는
+ * 운영자가 확인한 사실이고 리뷰는 사용자 신호다. 위아래로 갈라 두면 어느 쪽을
+ * 보고 있는지 헷갈리지 않는다.
  *
  * 확인일은 DESIGN.md 순서에 없지만 맨 아래에 남긴다 — 데이터 신선도 노출은
  * mvp-decisions.md 2-3의 구속력 있는 결정이다.
@@ -40,7 +47,7 @@ interface Fact {
  * work_fit("작업 적합도")은 여기 넣지 않는다. 추상 평가 대신 실제 판단 신호를
  * Quick Check에 모으라는 것이 DESIGN.md의 지시이고, work_fit은 마커 테두리 색으로만 쓴다.
  */
-export default function CafeCard({ cafe, onClose }: CafeCardProps) {
+export default function CafeCard({ cafe, onClose, onRequestEdit }: CafeCardProps) {
   const open = isOpenNow(cafe);
 
   const facts: Fact[] = [
@@ -137,8 +144,16 @@ export default function CafeCard({ cafe, onClose }: CafeCardProps) {
           </ul>
         )}
 
+        <ReviewSection cafe={cafe} />
+
         {/* 데이터 신선도를 숨기지 않고 드러낸다 (docs/mvp-decisions.md 2-3) */}
         <p className="cafe-panel__verified">{cafe.last_verified} 확인</p>
+
+        {/* 확인일 바로 아래다. "이 정보가 언제 확인된 것인가" 다음에 오는 자연스러운
+            물음이 "지금은 다른데요"이므로, 그 자리에서 고칠 길을 연다. */}
+        <button type="button" className="cafe-panel__edit-request" onClick={onRequestEdit}>
+          정보가 다른가요?
+        </button>
       </div>
     </aside>
   );
