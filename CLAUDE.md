@@ -98,7 +98,7 @@ playwright-cli close
 | `NEXT_PUBLIC_KAKAO_MAP_KEY` | 지도 대신 안내 문구가 렌더된다 — 의도된 폴백이다 |
 | `NEXT_PUBLIC_SUPABASE_URL` | `lib/supabase.ts`가 즉시 throw한다 |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 위와 같다 |
-| `SUPABASE_SERVICE_ROLE_KEY` | `scripts/approve-submission.mjs`가 거부한다. 앱은 이 키를 쓰지 않는다 — **`NEXT_PUBLIC_`을 붙이지 말 것** |
+| `SUPABASE_SERVICE_ROLE_KEY` | `scripts/prune-orphan-photos.mjs`가 거부한다. **평소에는 없어도 된다** — 승인은 대시보드 SQL로 끝난다. 앱은 이 키를 쓰지 않으므로 **`NEXT_PUBLIC_`을 붙이지 말 것** |
 
 Supabase 쪽은 폴백을 두지 않았다. 원본이 하나여야 하는데 조용히 JSON으로 되돌아가면 화면이 실제 DB와 다른 것을 보여주기 때문이다.
 
@@ -236,25 +236,31 @@ Supabase 클라이언트가 셋이다. **역할이 달라서 나눈 것이지 �
 - ⚠️ **공개 버킷이므로 검수 전 사진도 URL을 안다면 열린다.** 방어선은 셋이다 —
   로그인 사용자는 자기 `submissions/<uid>/` 아래에만 쓸 수 있고, 버킷에 5MB·이미지 3종
   제한이 있고, **폴더당 20장 상한**을 storage 정책이 `submission_photo_count()`로 건다.
+  그 함수는 **`places.photos`가 이미 쓰는 사진은 세지 않는다** — 승인된 사진은 검수
+  폴더에 남지만 자리를 차지하지 않아야 한다.
   개수 상한이 없으면 `MAX_PHOTOS`가 클라이언트에만 있는 셈이라(anon 키는 브라우저에
   나간다) 공개 버킷이 무한 업로드 대상이 된다.
 - **`submission-images`(비공개) 버킷은 폐기됐다.** 2026-08-20 오전에 잠깐 있었다.
   **storage 테이블은 SQL로 지울 수 없으므로**(`storage.protect_delete`가 막는다)
   버킷을 없애는 것은 대시보드나 Storage API로만 된다. 마이그레이션으로 지우려 하지 말 것.
-- **승인은 `scripts/approve-submission.mjs`로 한다.** 파일 이동은 Postgres가 못 하기
-  때문이다(`storage.objects`의 name만 바꾸면 실제 오브젝트와 어긋난다). 스크립트가
-  경로를 옮기고 `places.photos`에 붙인 뒤 승인 함수를 부른다 — **순서가 중요하다.**
-  각 단계는 **다시 돌려도 괜찮아야 한다**: 옮기기 전에 목적지를 보고 이미 있으면
-  건너뛰고, `places.photos`에도 중복으로 붙이지 않는다. 그래야 승인에서 실패한 뒤
-  재시도할 수 있다.
+- **승인은 SQL 한 줄이다. 키도 스크립트도 필요 없다.**
 
-  ```bash
-  node --env-file=.env.local scripts/approve-submission.mjs report <report-id> <place-id>
-  node --env-file=.env.local scripts/approve-submission.mjs edit   <request-id>
+  ```sql
+  -- 새 장소 제보: 카페를 먼저 만들고(제보에는 이름·주소·좌표가 없다) 연결한다
+  select public.approve_place_report('<제보id>', '<카페id>', '<큐레이터uuid>');
+  -- 정보 수정 요청: places를 직접 고친 뒤
+  select public.approve_edit_request('<요청id>', '<큐레이터uuid>');
   ```
 
-  `SUPABASE_SERVICE_ROLE_KEY`가 `.env.local`에 있어야 한다. **`NEXT_PUBLIC_` 접두사를
-  붙이지 않는다** — 붙이면 브라우저 번들에 실려 나간다.
+  함수가 **사진까지 붙인다.** 제보의 공개 URL을 경로로 되짚어 `places.photos`에 이어
+  붙이고(이미 있으면 건너뛴다), 상태와 확인일을 갱신한다.
+- **사진 파일은 옮기지 않는다.** `submissions/<uid>/`에 그대로 두고 `places.photos`가
+  그 경로를 가리킨다. 옮기려면 `<slug>/`에 쓸 권한이 필요한데 그것은 사용자에게 열려
+  있지 않고, 그 하나 때문에 **승인 전체가 service_role 키에 묶였었다.** 경로가 덜
+  깔끔한 대신 승인이 대시보드에서 끝난다.
+- **세 번째 인자가 필요한 이유.** 대시보드 SQL 편집기·psql·service_role은 세션이 없어
+  `auth.uid()`가 NULL이다. 세션이 있으면 인자는 무시되므로(`coalesce(auth.uid(), …)`)
+  로그인한 비큐레이터가 남을 사칭하는 경로는 열리지 않는다.
 - **버려진 사진 정리는 두 겹이다.**
   1. **앱이 그 자리에서 되돌린다** — `lib/submissions.ts`의 `removePhotos()`. 사진은
      제출 버튼을 누를 때 올라가고 insert가 그 뒤에 오므로, 중간에 실패하면(중복 제보,
@@ -262,7 +268,11 @@ Supabase 클라이언트가 셋이다. **역할이 달라서 나눈 것이지 �
      delete를 열어 두어 **사용자 세션만으로 된다** — 운영자 키가 필요 없다.
      지우기에 실패해도 **던지지 않는다.** 던지면 사용자가 알아야 할 원래 실패를 덮는다.
   2. **놓친 것은 스크립트가 걷어간다** — `scripts/prune-orphan-photos.mjs`. 탭을 닫거나
-     네트워크가 끊겨 1번이 못 돈 경우의 안전망이다.
+     네트워크가 끊겨 1번이 못 돈 경우의 안전망이다. **이 스크립트만 `SUPABASE_SERVICE_ROLE_KEY`가
+     필요하다**(storage 삭제는 SQL로 못 한다). 쓸 때만 넣고 지우면 된다 —
+     **`NEXT_PUBLIC_` 접두사를 붙이지 않는다.**
+     참조 목록에 `places.photos`도 포함한다. 승인해도 파일이 검수 폴더에 남으므로,
+     빠뜨리면 지도에 이미 뜨는 사진을 지우게 된다.
 
   ```bash
   node --env-file=.env.local scripts/prune-orphan-photos.mjs        # 목록만

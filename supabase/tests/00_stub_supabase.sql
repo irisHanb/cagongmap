@@ -28,13 +28,6 @@ returns uuid language sql stable as $$
   select nullif(current_setting('test.uid', true), '')::uuid;
 $$;
 
--- 승인 함수가 "세션 없이 온 service_role인가"를 이것으로 가른다.
--- 실제로는 JWT의 role 클레임이고, 정의자 함수 안에서도 호출자 것이 그대로 보인다
--- (current_user는 소유자로 바뀌므로 역할 판정에 쓰면 안 된다).
-create or replace function auth.role()
-returns text language sql stable as $$
-  select nullif(current_setting('test.role', true), '');
-$$;
 
 create extension if not exists pgcrypto;
 

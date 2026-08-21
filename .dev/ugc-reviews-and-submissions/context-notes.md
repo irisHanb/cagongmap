@@ -12,9 +12,9 @@
 |---|---|
 | 제보 테이블 | **둘.** `place_reports`(신규, `naver_place_url` 필수) · `place_edit_requests`(수정, `place_id` 필수). `place_submissions`와 `payload jsonb`는 없앴다 |
 | 승인 함수 | `approve_place_report(제보id, 카페id)` · `approve_edit_request(요청id)` + 반려 둘. **카페를 만들지 않는다** — 큐레이터가 `places`를 다룬 뒤 연결·상태 전환만 |
-| 승인 절차 | `node --env-file=.env.local scripts/approve-submission.mjs report <제보id> <카페id>`. 파일 이동은 Postgres가 못 해서 스크립트가 한다 |
+| 승인 절차 | 대시보드 SQL 한 줄 — `select approve_place_report('<제보>','<카페>','<큐레이터>')`. 함수가 사진까지 붙인다. **service_role 키 불필요** |
 | 리뷰 | `place_reviews`(PK `(user_id, place_id)`) + `place_review_counts(uuid)` 집계 함수. 테이블 select는 본인만 |
-| Storage 버킷 | **`place-images` 하나.** 5MB·이미지 3종 제한. 검수 전 사진은 `submissions/<uid>/`, 승인되면 `<slug>/` |
+| Storage 버킷 | **`place-images` 하나.** 5MB·이미지 3종·폴더당 20장 제한. 사진은 `submissions/<uid>/`에 두고 **옮기지 않는다** — `places.photos`가 그 경로를 가리킨다 |
 | `storage.objects` 정책 | insert·delete 둘. `bucket_id='place-images'` + `submissions/<본인 uid>/` 조건. SELECT·UPDATE는 일부러 없다 |
 | 사진 값의 모양 | `places.photos`는 **경로**, 제보 두 테이블의 `photos`는 **공개 URL**. check 제약이 서로를 막는다 |
 | URL 조립·해체 | `lib/place-images.ts` 하나뿐 (`placeImageUrl` / `placeImagePath`) |

@@ -13,8 +13,10 @@
  *
  * ─ 안전장치 셋 ──────────────────────────────────────────────────────────────
  *  1. **기본은 목록만 보여준다.** 지우려면 --yes를 붙여야 한다.
- *  2. **참조되는 파일은 절대 건드리지 않는다.** place_reports·place_edit_requests의
- *     photos(공개 URL)에서 경로를 되짚어 대조한다.
+ *  2. **참조되는 파일은 절대 건드리지 않는다.** 세 곳을 다 본다 —
+ *     place_reports·place_edit_requests의 photos(공개 URL)와 **places.photos(경로)**.
+ *     승인해도 파일을 옮기지 않으므로, 카페가 쓰는 사진이 검수 폴더에 그대로 남는다.
+ *     places를 빠뜨리면 이미 지도에 뜨는 사진을 지우게 된다.
  *  3. **갓 올라온 파일은 남긴다**(기본 60분). 폼을 열어 둔 채 사진만 고른 사람의
  *     파일을 지우지 않으려는 것이다. --min-age-minutes로 바꾼다.
  *
@@ -71,7 +73,8 @@ const PAGE = 500;
 async function referencedPaths() {
   const referenced = new Set();
 
-  for (const table of ['place_reports', 'place_edit_requests']) {
+  // places.photos는 URL이 아니라 경로다. toPath는 경로를 그대로 돌려준다.
+  for (const table of ['place_reports', 'place_edit_requests', 'places']) {
     for (let from = 0; ; from += PAGE) {
       const { data, error } = await db
         .from(table)

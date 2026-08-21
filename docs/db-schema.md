@@ -105,7 +105,7 @@ photos = {naruteo.jpeg}
 | 경로 | 뜻 | 쓸 수 있는 주체 |
 |---|---|---|
 | `submissions/<uid>/<uuid>.jpg` | 검수 전 제보 사진 | 본인 (storage 정책) |
-| `<slug>/<uuid>.jpg` | 승인된 카페 사진 | `service_role` 스크립트 |
+| `<slug>/<uuid>.jpg` | 운영자가 직접 올린 카페 사진 | 대시보드 |
 
 DB에 적히는 모양은 테이블마다 다르다. `places.photos`는 위 경로를, 제보 두 테이블은
 그 경로의 **공개 URL**을 담는다.
@@ -166,8 +166,9 @@ RLS 정책과 "같은 사람이 같은 대상에 대기 중 요청 하나"(부�
   하기 때문이다. 제보는 검수가 끝나면 수명이 끝나는 데이터라 URL에 프로젝트 ref가
   박히는 대가를 치를 만하다.
   check 제약이 `place-images` 공개 객체 URL 모양을 강제하므로 외부 CDN 이미지도,
-  경로만 적은 값도 거부된다. 파일은 검수 전 `submissions/<uid>/` 아래에 있고, 승인되면
-  같은 버킷의 `<slug>/`로 옮겨가면서 `places.photos`에는 **경로로** 붙는다.
+  경로만 적은 값도 거부된다. 파일은 `submissions/<uid>/`에 그대로 두고, 승인되면 그 경로가 `places.photos`에
+  **경로로** 붙는다 — 옮기지 않는 이유는 `<slug>/` 쓰기 권한 하나 때문에 승인 전체가
+  service_role 키에 묶이기 때문이다.
 - `place_reports.place_id`는 **승인된 뒤에만** 값을 갖는다. 대기 중에는 아직 카페가 없고
   (`place_reports_pending_has_no_place`), 승인은 곧 "이 카페로 등록했다"이므로 비어 있을
   수 없다(`place_reports_approved_has_place`).
@@ -183,16 +184,9 @@ RLS 정책과 "같은 사람이 같은 대상에 대기 중 요청 하나"(부�
 `places`에 부었는데, 그 payload는 사실 운영자가 승인 직전에 손으로 채운 값이었다 —
 사용자가 보내지 않은 것을 사용자가 보낸 것처럼 다루는 구조였다.
 
-**사진이 붙은 제보는 스크립트로 승인한다.** 파일 이동은 Postgres가 못 하기 때문이다
-(`storage.objects`의 name만 바꾸면 실제 오브젝트와 어긋난다).
-
-```bash
-node --env-file=.env.local scripts/approve-submission.mjs report <report-id> <place-id>
-node --env-file=.env.local scripts/approve-submission.mjs edit   <request-id>
-```
-
-스크립트가 사진을 `<slug>/`로 옮기고 `places.photos`에 붙인 뒤 아래 함수를 부른다.
-`SUPABASE_SERVICE_ROLE_KEY`가 필요하다.
+**승인은 SQL 한 줄이다.** 함수가 사진까지 붙인다 — 제보의 공개 URL을 경로로 되짚어
+`places.photos`에 이어 붙이고(중복은 건너뛴다) 상태를 바꾼다. 파일을 옮기지 않으므로
+service_role 키도, 스크립트도 필요 없다.
 
 ```sql
 -- 새 장소 제보: 큐레이터가 카페를 먼저 만들고, 그 카페에 제보를 연결한다
@@ -204,11 +198,14 @@ values ('...', '...', 37.5, 127.1, false, '10:00', '22:00',
         'published', current_date, auth.uid())
 returning id;
 
-select public.approve_place_report('<report id>', '<방금 만든 place id>');
+select public.approve_place_report('<report id>', '<방금 만든 place id>', '<큐레이터 uuid>');
 
 -- 정보 수정 요청: places를 직접 고친 뒤
-select public.approve_edit_request('<request id>');   -- last_verified를 오늘로 옮긴다
+select public.approve_edit_request('<request id>', '<큐레이터 uuid>');
 ```
+
+세 번째 인자는 **세션이 없는 호출에서만** 쓰인다(대시보드 SQL·psql·service_role).
+로그인한 호출에서는 `auth.uid()`가 먼저 잡히므로 사칭이 되지 않는다.
 
 - `reject_place_report(uuid, text, uuid)` / `reject_edit_request(uuid, text, uuid)`: 반려 + 사유.
 - 넷 다 `security definer`이고 `resolve_reviewer()`로 먼저 막는다. `authenticated`에만 grant.

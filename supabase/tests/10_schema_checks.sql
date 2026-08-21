@@ -134,11 +134,9 @@ begin
 exception when raise_exception then raise notice 'OK: %', sqlerrm;
 end $$;
 
-\echo '-- 세션 없이 온 service_role은 승인자를 인자로 지정할 수 있다'
--- 파일 이동이 Storage API를 거쳐야 해서 운영 스크립트가 service_role로 돈다.
--- 그때 auth.uid()는 NULL이므로 이 경로가 없으면 승인이 영영 통과하지 못한다.
+\echo '-- 세션 없는 호출(대시보드 SQL·운영 스크립트)은 승인자를 인자로 지정한다'
+-- 그 경로에서는 auth.uid()가 NULL이다. 이것이 없으면 승인이 영영 통과하지 못한다.
 set local test.uid = '';
-set local test.role = 'service_role';
 do $$
 begin
   perform public.approve_place_report(
@@ -151,7 +149,6 @@ end $$;
 
 \echo '-- 로그인한 비큐레이터는 인자로 남을 사칭할 수 없다'
 set local test.uid = '22222222-2222-2222-2222-222222222222';
-set local test.role = 'authenticated';
 do $$
 begin
   perform public.approve_place_report(
@@ -163,17 +160,29 @@ exception when raise_exception then raise notice 'OK: %', sqlerrm;
 end $$;
 
 set local test.uid = '';
-set local test.role = 'service_role';
 select public.approve_place_report(
          (select id from public.place_reports limit 1), :'new_place_id',
          '11111111-1111-1111-1111-111111111111');
-set local test.role = '';
 \echo '-- 승인되면 제보가 등록된 카페를 가리킨다'
 select status,
        place_id = :'new_place_id' as linked,
        reviewed_at is not null    as reviewed,
        reviewed_by = '11111111-1111-1111-1111-111111111111' as reviewer_recorded
   from public.place_reports;
+
+\echo '-- 승인이 사진까지 붙인다 (파일을 옮기지 않으므로 경로가 그대로 온다)'
+select photos from public.places where id = :'new_place_id';
+
+\echo '-- 다시 승인하려 하면 거부된다 (사진이 두 번 붙지 않는다)'
+do $$
+begin
+  perform public.approve_place_report(
+    (select id from public.place_reports limit 1),
+    (select id from public.places where naver_place_url = 'https://naver.me/testReport'),
+    '11111111-1111-1111-1111-111111111111');
+  raise exception 'FAIL: 이미 처리된 제보가 또 통과했다';
+exception when raise_exception then raise notice 'OK: %', sqlerrm;
+end $$;
 
 \echo '=== 9. 정보 수정 요청 → 승인 ==='
 \echo '-- 확인일을 어제로 돌려놓고 시작한다'

@@ -36,7 +36,7 @@
 - [x] T13-1 제보 테이블 분리·이미지 규칙에 맞춰 `supabase/tests/10_schema_checks.sql`·`20_rls_checks.sql`을 다시 쓴다 (ac: AC14) (after: T4-1, T4-2)
 - [x] T14 문서 갱신 — `docs/scope.md`(제보·리뷰를 1차로 이동 + 변경 이력), `DESIGN.md`(리뷰 섹션의 상세 패널 내 위치, 모달 규칙 변경, 새 컴포넌트 규격), `docs/db-schema.md`(RLS 요약표), `CLAUDE.md`(로그인 판정 위치, 이미지 규칙) (ac: AC16)
 - [x] T15 `npm run verify` · `./scripts/verify-schema.sh` · `npm run build` 실행, 로그아웃 상태 브라우저 확인(`playwright-cli`) (ac: AC9, AC13, AC14, AC15) (after: T12, T13)
-- [x] T16 운영 스크립트 둘 — `scripts/approve-submission.mjs`(사진 이관 + 승인), `scripts/prune-orphan-photos.mjs`(버려진 사진 청소, dry-run 기본). 둘 다 `SUPABASE_SERVICE_ROLE_KEY`가 필요하다 (req: R24-1) (ac: AC12, AC12-1) (after: T4-2)
+- [x] T16 `scripts/prune-orphan-photos.mjs`(버려진 사진 청소, dry-run 기본). **이것만** `SUPABASE_SERVICE_ROLE_KEY`가 필요하다 — 승인은 SQL 한 줄로 끝난다 (req: R24-1) (ac: AC12-1) (after: T4-2)
 
 ## Acceptance Criteria
 
@@ -51,12 +51,19 @@
 - [x] AC9 네이버가 아닌 URL은 제출이 막히고 업로드조차 하지 않는다 — 단위 테스트
 - [x] AC10 업로드 파일이 `place-images/submissions/<uid>/`에 있고, 테이블의 공개 URL이 로그인 없이 열린다(200 + image/png) — curl로 확인
 - [x] AC11 남의 uid 폴더나 카페 사진 자리(`<slug>/`)로 insert하면 storage 정책이 막는다
-- [ ] AC12 `approve-submission.mjs`가 사진을 옮기고 제보를 `approved`로 만든다 — **미확인**(승인할 제보를 아직 처리하지 않았다)
+- [x] AC12 `approve_place_report(...)`가 사진을 `places.photos`에 붙이고 제보를 `approved`로 만든다 — 실제 제보로 확인(롤백), 스키마 테스트 8절
 - [ ] AC12-1 제출이 실패하면 방금 올린 사진이 버킷에 남지 않는다 — **단위 테스트만 통과**, 실제 중복 제출로는 미확인
 - [x] AC13 `npm run verify` 통과 (75 테스트, warning 0)
 - [x] AC14 `./scripts/verify-schema.sh`가 `✅ 통과`로 끝난다
 - [x] AC15 `npm run build`에서 `/` 라우트가 정적 렌더를 유지한다
 - [x] AC16 `docs/scope.md`·`DESIGN.md`·`docs/db-schema.md`·`CLAUDE.md`가 갱신돼 있다
+
+## 후속 (2026-08-21) — service_role 키 없애기
+
+- [x] F11 `resolve_reviewer`를 "세션이 없으면"으로 넓힌다 — F1의 `auth.role()='service_role'` 조건이 대시보드 SQL 편집기까지 막고 있었다
+- [x] F12 승인 함수가 사진을 직접 붙인다. 파일 이관을 없애고 `scripts/approve-submission.mjs`를 지운다 — 이관 하나 때문에 승인 전체가 키에 묶여 있었다
+- [x] F13 `submission_photo_count`가 `places.photos`가 쓰는 사진을 세지 않는다 — 안 옮기면 승인해도 상한이 안 비워진다
+- [x] F14 `prune-orphan-photos.mjs`의 참조 목록에 `places.photos` 추가 — 빠뜨리면 지도에 뜨는 사진을 지운다
 
 ## 코드 리뷰 후속 (2026-08-20)
 
@@ -67,7 +74,7 @@
 - [x] F5 `prune-orphan-photos.mjs` 페이지네이션 — 1000행에서 잘리면 참조된 사진을 고아로 오인한다
 - [x] F6 `submitEdit`의 `resolvePlaceId`를 업로드보다 먼저 — 거기서 던지면 롤백을 지나쳤다
 - [x] F7 `split_submissions` 사전 점검이 놓치던 행(내용 없는 수정 요청, 대상 없는 수정 요청, 형식 틀린 URL)
-- [x] F8 `approve-submission.mjs`를 재시도 가능하게 — 목적지에 이미 있으면 건너뛰고 photos도 중복으로 붙이지 않는다
+- [x] F8 재시도 가능하게 — 이후 이관 자체를 없애면서(2026-08-21) 승인이 SQL 한 번으로 끝나 재시도 문제가 사라졌다. 사진은 중복으로 붙지 않는다
 - [x] F9 모달 주석의 `kind='edit'` / `kind='new'` 잔재 제거
 - [x] F10 위 셋(F1·F2·F3)에 대한 검증 추가 — 스키마 테스트 3케이스, 경합 회귀 테스트 1개(수정을 되돌리면 실패하는 것을 확인)
 
@@ -76,7 +83,7 @@
 - [x] 카카오 로그인 후 AC1·AC2 (리뷰 선택·해제·이동, 새로고침 유지)
 - [x] 신규 제보 제출과 사진 업로드 (AC8, AC10)
 - [ ] 같은 카페에 중복 제출 → 안내 문구 확인, 그 뒤 `prune-orphan-photos.mjs`가 고아 0장을 보고하는지 (AC7, AC12-1)
-- [ ] `places`에 카페를 만든 뒤 `approve-submission.mjs report <제보id> <카페id>` 실행 (AC12)
+- [ ] `places`에 카페를 만든 뒤 대시보드에서 `select approve_place_report(...)` 실행 — 실제 데이터로 한 번 (AC12)
 - [x] 리뷰 버튼 색 확인 — `good`에만 민트 (AC5)
 - [ ] 폐기된 `submission-images` 버킷을 대시보드에서 삭제 (SQL로는 `storage.protect_delete`가 막는다)
 - [ ] `supabase db push`가 열 개 마이그레이션을 순서대로 통과하는지 (원격에는 MCP로 이미 적용됨)

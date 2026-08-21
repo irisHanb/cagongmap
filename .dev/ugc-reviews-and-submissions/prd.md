@@ -5,8 +5,12 @@
 > 커밋: `fd29426` (스키마·데이터 계층) · `5abec5e` (화면) · `d4a20f3` (문서)
 >
 > **2026-08-20 코드 리뷰 후속.** 9건을 고쳤다 — 가장 큰 것은 **승인 경로가 애초에
-> 동작하지 않았다는 것**이다(아래 R24-1). 나머지는 리뷰 조회 경합, 업로드 개수 상한,
-> 세션 판정 전 클릭, 스크립트 페이지네이션·재시도, 롤백 누락이다.
+> 동작하지 않았다는 것**이다. 나머지는 리뷰 조회 경합, 업로드 개수 상한,
+> 세션 판정 전 클릭, 스크립트 페이지네이션, 롤백 누락이다.
+>
+> **2026-08-21.** 그 수정이 대시보드 SQL까지 막은 것을 발견해 조건을 넓히고, **사진
+> 이관을 아예 없앴다.** 이관 하나 때문에 승인 전체가 service_role 키에 묶여 있었다.
+> 이제 승인은 SQL 한 줄이고 `scripts/approve-submission.mjs`는 지웠다.
 
 ## Summary
 
@@ -86,9 +90,9 @@
 2. 상세 하단 `정보가 다른가요?`를 누른다 → 모달에서 사진 2장과 메모를 붙여 보낸다 →
    `place_edit_requests`에 `pending`으로 쌓인다.
 3. dock의 `카페 제보하기`를 누른다 → 네이버 URL·사진·메모를 넣고 보낸다 → `place_reports`.
-4. 운영자가 `places`에 카페를 만들고(제보에는 이름·주소·좌표가 없다)
-   `node --env-file=.env.local scripts/approve-submission.mjs report <제보id> <카페id>`를
-   돌린다 → 사진이 `<slug>/`로 옮겨가고 `places.photos`에 붙은 뒤 제보가 `approved`가 된다.
+4. 운영자가 `places`에 카페를 만들고(제보에는 이름·주소·좌표가 없다) 대시보드에서
+   `select public.approve_place_report('<제보id>', '<카페id>', '<큐레이터uuid>')`를 친다
+   → 사진이 `places.photos`에 붙고 제보가 `approved`가 된다.
 
 ## Pre-Work
 
@@ -107,8 +111,9 @@
 ## Non-Goals
 
 - **큐레이터 검수 화면(`/admin`).** 승인·반려는 대시보드에서 SQL로 한다.
-- ~~**승인 시 사진 자동 이관.**~~ → 범위에 들어왔다. 버킷을 하나로 합치면서 이관이 같은
-  버킷 안의 경로 변경이 됐고, `scripts/approve-submission.mjs`가 그것까지 한다.
+- ~~**승인 시 사진 자동 이관.**~~ → **이관 자체를 없앴다.** 사진은 `submissions/<uid>/`에
+  그대로 두고 `places.photos`가 그 경로를 가리킨다. 옮기려면 `<slug>/` 쓰기 권한이
+  필요한데, 그 하나 때문에 승인 전체가 service_role 키에 묶였다 (2026-08-21).
 - **폐업 신고.** 테이블을 가르면서 `kind='closed'` 자리도 없앴다. 필요해지면
   `place_closure_reports`를 따로 만든다.
 - **리뷰 본문 텍스트, 리뷰 목록, 작성자 표시, 신고·차단.**
@@ -244,20 +249,13 @@
   올리는 마이그레이션을 넣는다. 없으면 승인 함수가 항상 예외를 던진다.
   대상 행이 없는 환경(검증 컨테이너)에서는 0행 업데이트로 조용히 지나가야 한다.
 
-- **R24-1.** 승인은 스크립트로 한다 — `scripts/approve-submission.mjs`. **파일 이동은
-  Postgres가 못 하기 때문이다**(`storage.objects`의 name만 바꾸면 실제 오브젝트와
-  어긋난다). 스크립트가 사진을 `<slug>/`로 옮기고 `places.photos`에 **경로로** 붙인 뒤
-  승인 함수를 부른다. **순서가 중요하다** — 파일을 먼저 옮기고 마지막에 승인해야, 중간에
-  실패해도 `pending`으로 남아 다시 시도할 수 있다. `SUPABASE_SERVICE_ROLE_KEY`가 필요하며
-  **`NEXT_PUBLIC_` 접두사를 붙이지 않는다.**
-- **R24-2.** 승인 함수는 **승인자를 인자로 받는다**(`p_reviewer`). service_role 키의
-  JWT에는 `sub`가 없어 `auth.uid()`가 NULL이고, 그래서 인자가 없던 첫 구현에서는
-  스크립트의 승인이 **한 번도 성공할 수 없었다.** 세션이 있으면 그 사람이 우선이라
-  사칭 경로는 열리지 않는다.
-- **R24-3.** 스크립트의 각 단계는 **다시 돌려도 같은 결과여야 한다.** 옮기기 전에
-  목적지를 보고 이미 있으면 건너뛰고, `places.photos`에도 중복으로 붙이지 않는다.
-  그러지 않으면 승인에서 한 번 실패한 제보는 재시도 때 `storage.move`가 원본을 못 찾아
-  영영 `pending`에 갇힌다.
+- **R24-1.** 승인은 **SQL 한 줄**이다. `approve_place_report(제보id, 카페id, 승인자)` /
+  `approve_edit_request(요청id, 승인자)`가 사진까지 붙이고(공개 URL → 경로, 중복은
+  건너뜀) 상태를 바꾼다. **service_role 키도 스크립트도 필요 없다** — 대시보드 SQL
+  편집기에서 그대로 된다.
+- **R24-2.** 승인 함수는 승인자를 인자로 받는다(`p_reviewer`). 세션 없는 호출
+  (대시보드 SQL·psql·service_role)에서는 `auth.uid()`가 NULL이기 때문이다. 세션이 있으면
+  인자는 무시되므로(`coalesce(auth.uid(), p_reviewer)`) 사칭 경로는 열리지 않는다.
 - **R7-1.** 업로드 개수 상한을 **서버에서** 건다. `MAX_PHOTOS`는 클라이언트에만 있고
   anon 키는 브라우저에 나가므로, 공개 버킷의 자기 폴더에 무한정 올릴 수 있었다.
   storage 정책이 `submission_photo_count() < 20`을 함께 검사한다.
@@ -301,9 +299,9 @@
 - **AC11.** 다른 uid 폴더나 카페 사진 자리(`<slug>/`)로 insert를 시도하면 storage 정책이
   막는다. (`supabase/tests/20_rls_checks.sql`)
 - **AC12.** 큐레이터가 `places`에 카페를 만든 뒤
-  `scripts/approve-submission.mjs report <제보id> <카페id>`를 실행하면, 사진이 `<slug>/`로
-  옮겨가 `places.photos`에 경로로 붙고 제보 `status`가 `approved`, `place_id`가 그 카페로
-  바뀐다. (스크립트 출력 + SQL — 사람이 실행)
+  `select approve_place_report('<제보id>','<카페id>','<큐레이터uuid>')`를 실행하면,
+  제보 사진이 `places.photos`에 경로로 붙고 `status`가 `approved`, `place_id`가 그 카페로
+  바뀐다. 두 번째 호출은 거부된다. (`supabase/tests/10_schema_checks.sql` 8절)
 - **AC12-1.** 제출이 실패하면(같은 대상에 두 번째 요청) 방금 올린 사진이 버킷에 남지 않는다.
   (`scripts/prune-orphan-photos.mjs`가 고아 0장을 보고한다)
 - **AC13.** `npm run verify`가 통과한다. `npm run lint`는 `--max-warnings=0`이므로 warning도
@@ -349,7 +347,7 @@ SQL 확인은 Supabase MCP(`execute_sql`)로 한다. 리뷰·제보 행 확인(A
 6. 신규 제보 모달에서 네이버 URL + 사진 2장 제출 (AC8)
 7. Supabase 대시보드 Storage에서 `place-images/submissions/<내 uid>/`에 파일이 있는지,
    테이블의 URL을 클릭하면 사진이 열리는지 (AC10)
-8. `places`에 카페를 만든 뒤 `scripts/approve-submission.mjs`로 승인 (AC12)
+8. `places`에 카페를 만든 뒤 대시보드 SQL로 `approve_place_report(...)` 승인 (AC12)
 9. 중복 제보를 일부러 내고 `prune-orphan-photos.mjs`로 고아가 0장인지 (AC12-1)
 9. 색 확인 (AC5)
 
@@ -394,7 +392,6 @@ components/submission/EditRequestModal.tsx
 components/submission/NewPlaceModal.tsx
 components/submission/PhotoPicker.tsx  # 파일 선택·미리보기·검증 (두 모달 공용)
 components/submission/PhotoPicker.test.tsx
-scripts/approve-submission.mjs         # 사진 이관 + 승인 (service_role)
 scripts/prune-orphan-photos.mjs        # 버려진 제보 사진 청소 (service_role)
 ```
 
@@ -458,8 +455,8 @@ scripts/prune-orphan-photos.mjs        # 버려진 제보 사진 청소 (service
   위치가 `AuthProvider`로 옮겨간 것).
 - **T15.** `npm run verify`, `./scripts/verify-schema.sh`, `npm run build`, 로그아웃 상태
   브라우저 확인.
-- **T16.** 운영 스크립트 둘 — `approve-submission.mjs`(사진 이관 + 승인),
-  `prune-orphan-photos.mjs`(버려진 사진 청소, dry-run 기본).
+- **T16.** 운영 스크립트 — `prune-orphan-photos.mjs`(버려진 사진 청소, dry-run 기본).
+  승인은 SQL 한 줄이라 스크립트가 없다.
 
 ## Risks And Open Decisions
 
