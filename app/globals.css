@@ -1208,3 +1208,70 @@ a {
   font-weight: 500;
   line-height: 16px;
 }
+
+/* ---------------------------------------------------------------
+   폴백 화면 — 404와 에러.
+   지도 셸 밖에 있는 유일한 표면이라 dock의 규격(surface·r-panel·shadow-brew·eyebrow)을
+   그대로 빌려 쓴다. 새 색이나 스케일 밖 여백을 만들지 않는다.
+   --------------------------------------------------------------- */
+
+.fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: var(--sp-lg);
+}
+
+.fallback__panel {
+  width: 390px;
+  max-width: 100%;
+  padding: var(--sp-xl);
+  border-radius: var(--r-panel);
+  background: var(--surface-container-lowest);
+  box-shadow: var(--shadow-brew);
+  text-align: center;
+}
+
+.fallback__title {
+  margin-top: var(--sp-xs);
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 36px;
+}
+
+.fallback__body {
+  margin-top: var(--sp-sm);
+  color: var(--on-surface-variant);
+}
+
+/* dock-action과 같은 pill이지만 dock 안이 아니라 가운데 놓이므로 폭만 다르다 */
+.fallback__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  margin-top: var(--sp-lg);
+  padding: 0 var(--sp-lg);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--r-full);
+  background: var(--surface-container-lowest);
+  color: var(--on-surface-variant);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.fallback__action:hover {
+  background: var(--surface-container);
+  color: var(--on-surface);
+}
+
+/* 로그와 맞춰볼 때만 쓰는 값이다. 실패에 색을 주지 않는다 (DESIGN.md) */
+.fallback__digest {
+  margin-top: var(--sp-md);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--outline);
+}

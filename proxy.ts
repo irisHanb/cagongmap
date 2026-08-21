@@ -42,5 +42,11 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   // 정적 파일과 이미지 최적화 요청에서는 세션을 갱신할 이유가 없다.
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  //
+  // opengraph-image·apple-icon·robots.txt도 뺀다. 확장자가 없어서 아래 확장자 목록을
+  // 빠져나가는데, 카카오톡·슬랙·디스코드가 링크를 펼칠 때마다 여기로 들어와 Supabase
+  // getUser()를 한 번씩 부르게 된다. 세션이 있을 리 없는 요청이다.
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|opengraph-image|apple-icon|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
 };

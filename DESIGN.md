@@ -455,6 +455,53 @@ Positive condition은 `pastel-mint` icon background와 `positive-text`를 쓴다
 - 버튼 전체를 네이버 초록색으로 칠하기
 - 주소 옆에 붙여 레이아웃을 복잡하게 만들기
 
+### Brand Mark
+
+브랜드 마크는 `app/icon.svg` 하나가 원본이다. primary 바탕에 warm-cream 핀, 핀 안에 컵을
+파낸 모양이다.
+
+- 파비콘(`app/favicon.ico`)은 이 SVG에서 뽑는다 — `node scripts/generate-favicon.mjs`.
+- iOS 아이콘(`app/apple-icon.tsx`)은 **모서리를 둥글리지 않는다.** iOS가 자기 마스크를
+  씌우므로 미리 깎으면 두 번 잘린다.
+
+금지:
+
+- 마크를 손으로 다시 그려 파일마다 다른 모양을 만들기
+- 마크에 카페 사진을 얹기
+
+### Share Card
+
+링크를 펼쳤을 때 뜨는 1200×630 카드(`app/opengraph-image.tsx`). dock의 브랜드 블록과 같은
+순서다 — eyebrow `WORK CAFE MAP` → 워드마크 `카공맵` → 한 줄 설명 → 권역.
+
+- Background: surface
+- 마크 116px + 워드마크 108px/800
+- 설명은 **두 줄로 직접 끊는다.** satori는 한글을 글자 단위로 끊어서, 흘려보내면 낱말
+  가운데가 갈린다.
+
+금지:
+
+- **카페 사진 넣기** — 지금 사진은 이용 권리를 확인하지 않았다 (`docs/mvp-decisions.md` 3절)
+- 카페 수처럼 바뀌는 값 넣기 — 스크래퍼가 오래 캐시하므로 곧 옛 값이 된다
+- 큰 CTA나 다색 장식 얹기
+
+### Fallback Screens
+
+404(`app/not-found.tsx`)와 에러(`app/error.tsx`)는 지도 셸 밖에 있는 유일한 표면이다.
+dock의 규격을 그대로 빌려 쓴다 — surface, `r-panel`, `shadow-brew`, eyebrow, pill 액션.
+
+- Panel width: 390px (dock과 같다)
+- 404: `없는 페이지예요` + `지도로 돌아가기`
+- 에러: `지도를 불러오지 못했어요` + `다시 시도` + 오류 번호 한 줄
+
+금지:
+
+- 에러·404에 경고색 주기. 실패에 색을 주지 않는 규칙이 여기에도 걸린다
+- 막다른 골목 만들기. 두 화면 다 지도로 돌아갈 길이 있어야 한다
+
+`app/global-error.tsx`는 루트 레이아웃이 터졌을 때만 뜬다. 그 화면은 `globals.css`가 닿지
+않으므로 토큰을 리터럴로 적는다 — **유일하게 하드코딩된 색이 허용되는 곳이다.**
+
 ## Interaction Rules
 
 - 마커 클릭 시 상세 패널을 연다.
@@ -492,3 +539,4 @@ Positive condition은 `pastel-mint` icon background와 `positive-text`를 쓴다
 - `별로`·실패·빈 상태에 경고색을 주지 않는다. 색이 드는 것은 좋은 조건뿐이다.
 - 평가 개수를 별점이나 큰 숫자로 키우지 않는다. 표본이 한 자릿수인 동안 그것은 과장이다.
 - 제보 폼에 콘센트·소음 같은 구조화된 필드를 늘어놓지 않는다. 그 값은 운영자가 확인해 매긴다.
+- 공유 카드와 브랜드 마크에 카페 사진을 얹지 않는다. 권리를 확인하지 않은 사진이 링크를 타고 퍼진다.
