@@ -31,6 +31,10 @@ npm run test:run   # vitest 1회 실행
   타입만 볼 때 `npm run build`를 돌릴 이유가 없다.
 - **`npm run lint`는 `--max-warnings=0`이다.** warning을 남겨 두면 exit 0으로 통과해
   아무도 보지 않게 된다.
+- **React Compiler 규칙이 두 가지를 error로 막는다** — effect 안에서 `setState`를 부르는
+  것(cascading render)과 **렌더 중 ref를 읽는 것**. "렌더에서 만들고 정리해야 하는 값"
+  (blob URL 같은)에서 둘 다 막히므로, 우회로를 찾기 전에 `useMemo` + cleanup effect가
+  가능한지부터 본다 (`components/submission/PhotoPicker.tsx` 참고).
 
 ### pre-commit 훅
 
@@ -59,6 +63,11 @@ npm run test:run   # vitest 1회 실행
 - 세션이 필요한 컴포넌트는 **`@/lib/supabase-browser` 하나만 `vi.mock`한다.**
   AuthProvider·BookmarkProvider는 실제 코드가 돌게 둔다 (`components/cafe/CafeCard.test.tsx` 참고).
 - 실제 Supabase에 붙는 테스트는 없다. DB 쪽 검증은 `./scripts/verify-schema.sh`가 따로 한다.
+- **버그를 잡는 테스트는 수정을 되돌려 실패하는지 확인하고 넣는다.** 통과만 보고 넣으면
+  무른 테스트가 남는다.
+- **가짜 서버 목은 응답을 호출 시점 스냅샷으로 만든다.** 지연 뒤에 현재 상태를 읽어
+  돌려주면 "늦게 도착한 옛 응답"이 재현되지 않아 경합 테스트가 통과해 버린다
+  (`components/review/ReviewSection.test.tsx` 참고).
 - **`npm run verify`가 초록인 것과 화면이 도는 것은 다르다.** UI를 건드렸으면 아래
   「브라우저 검증」을 따른다.
 
@@ -406,6 +415,22 @@ grep -n "enable row level security\|create policy" supabase/migrations/<파일>.
 ```
 
 정책 요약표는 `docs/db-schema.md`의 "RLS 요약"에 있다. **정책을 바꾸면 그 표도 같이 고친다.**
+
+⚠️ **Supabase MCP `apply_migration`으로 적용했으면 로컬 파일명을 기록된 버전으로 바꾼다.**
+MCP는 파일명을 무시하고 자체 타임스탬프로 기록하므로, 그대로 두면 두 가지가 어긋난다.
+
+- `supabase db push`가 이미 적용된 마이그레이션을 다시 적용하려 든다.
+- `./scripts/verify-schema.sh`는 **파일명 순서**로 돌기 때문에, 새 파일에 앞선 시각을
+  붙이면 아직 없는 테이블을 건드려 깨진다.
+
+```bash
+# 적용 뒤 기록된 버전을 확인하고 그 이름으로 바꾼다
+select version, name from supabase_migrations.schema_migrations order by version desc limit 1;
+mv supabase/migrations/<임시>.sql supabase/migrations/<버전>_<이름>.sql
+```
+
+**이미 적용된 마이그레이션의 내용은 고치지 않는다.** 틀렸으면 새 파일로 덮고, 폐기됐으면
+내용을 비우되 파일과 버전은 남긴다(`20260820113058_submission_images_bucket.sql`이 그 예다).
 
 
 ## 문서 (`docs/`)
