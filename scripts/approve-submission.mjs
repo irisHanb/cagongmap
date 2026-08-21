@@ -18,10 +18,18 @@
  * pending으로 남아 다시 시도할 수 있다. 반대로 하면 "승인됐는데 사진이 없는" 상태가
  * 되고, 그건 사람이 눈치채기 어렵다.
  *
+ * **그래서 각 단계가 다시 돌아도 괜찮아야 한다.** 파일은 옮겼는데 승인에서 실패한
+ * 경우, 다시 돌리면 원본이 이미 없어 move가 깨진다. 그것을 막으려고 옮기기 전에
+ * 목적지를 먼저 보고, 이미 있으면 건너뛴다. places.photos도 중복으로 붙이지 않는다.
+ *
  * ─ service_role 키가 필요하다 ───────────────────────────────────────────────
  * 사용자는 submissions/<본인 uid>/ 아래에만 쓸 수 있다. 카페 사진이 놓이는 <slug>/는
  * 정책이 열어 주지 않으므로, 그쪽으로 옮기는 이 스크립트만 RLS를 우회하는
  * service_role 키를 쓴다.
+ *
+ * service_role 키의 JWT에는 sub 클레임이 없어 DB에서 auth.uid()가 NULL이다. 그래서
+ * **누구의 이름으로 승인하는지를 인자로 넘긴다**(승인 함수의 p_reviewer). 세션이 있는
+ * 호출에서는 그 인자가 무시되므로, 로그인한 사람이 남을 사칭하는 경로는 열리지 않는다.
  *
  *   .env.local에 SUPABASE_SERVICE_ROLE_KEY=... 를 넣는다 (NEXT_PUBLIC_ 접두사를
  *   붙이지 않는다. 붙이면 브라우저 번들에 그대로 실려 나간다).
@@ -54,13 +62,14 @@ if (!url || !serviceKey) {
 
 const db = createClient(url, serviceKey, { auth: { persistSession: false } });
 
-const [kind, id, placeId] = process.argv.slice(2);
+const args = process.argv.slice(2);
+const [kind, id, placeId] = args.filter((a) => !a.startsWith('--'));
 
 if (kind !== 'report' && kind !== 'edit') {
   console.error(
     '사용법:\n' +
-      '  approve-submission.mjs report <report-id> <place-id>\n' +
-      '  approve-submission.mjs edit   <request-id>',
+      '  approve-submission.mjs report <report-id> <place-id> [--reviewer=<uuid>]\n' +
+      '  approve-submission.mjs edit   <request-id> [--reviewer=<uuid>]',
   );
   process.exit(1);
 }
@@ -77,12 +86,27 @@ function fail(message) {
  * 드러날 이유가 없고, 나중에 사람이 파일을 찾을 때도 slug가 낫다.
  */
 async function movePhotos(photos, place) {
-  const moved = [];
+  const prefix = place.slug ?? place.id;
 
+  // 목적지를 먼저 본다. 앞선 실행이 파일만 옮기고 승인에서 멈췄다면 여기 이미 있다.
+  const { data: existing, error: listError } = await db.storage
+    .from(BUCKET)
+    .list(prefix, { limit: 1000 });
+
+  if (listError) fail(`카페 사진 폴더를 훑지 못했습니다: ${listError.message}`);
+  const already = new Set((existing ?? []).map((entry) => entry.name));
+
+  const moved = [];
   for (const photo of photos) {
     const path = toPath(photo);
-    const prefix = place.slug ?? place.id;
-    const target = `${prefix}/${path.split('/').pop()}`;
+    const file = path.split('/').pop();
+    const target = `${prefix}/${file}`;
+
+    if (already.has(file)) {
+      console.log(`  · ${file} — 이미 옮겨져 있다 (건너뜀)`);
+      moved.push(target);
+      continue;
+    }
 
     const { error } = await db.storage.from(BUCKET).move(path, target);
 
@@ -94,17 +118,56 @@ async function movePhotos(photos, place) {
   return moved;
 }
 
-/** 옮긴 **경로**를 카페 사진 뒤에 붙인다(places.photos는 URL이 아니다). 기존 사진은 그대로 둔다. */
+/**
+ * 옮긴 **경로**를 카페 사진 뒤에 붙인다(places.photos는 URL이 아니다).
+ * 기존 사진은 그대로 두고, 이미 붙어 있는 경로는 다시 넣지 않는다 — 다시 돌려도
+ * 같은 결과여야 한다.
+ */
 async function appendPhotos(place, paths) {
-  if (paths.length === 0) return;
+  const next = [...place.photos];
+  for (const path of paths) {
+    if (!next.includes(path)) next.push(path);
+  }
+
+  if (next.length === place.photos.length) {
+    if (paths.length > 0) console.log('  · places.photos 그대로 (이미 붙어 있다)');
+    return;
+  }
 
   const { error } = await db
     .from('places')
-    .update({ photos: [...place.photos, ...paths] })
+    .update({ photos: next })
     .eq('id', place.id);
 
   if (error) fail(`places.photos를 갱신하지 못했습니다: ${error.message}`);
-  console.log(`  · places.photos += ${paths.length}장`);
+  console.log(`  · places.photos += ${next.length - place.photos.length}장`);
+}
+
+/**
+ * 누구의 이름으로 승인할지. service_role에는 세션이 없으므로 DB가 이것을 인자로 받는다.
+ *
+ * 큐레이터가 한 명이면 그 사람으로 하고, 여럿이면 --reviewer=<uuid>로 고르게 한다.
+ * 임의로 아무나 고르면 검수 이력이 엉뚱한 사람 앞으로 남는다.
+ */
+async function resolveReviewer() {
+  const flag = args.find((a) => a.startsWith('--reviewer='))?.split('=')[1];
+  if (flag) return flag;
+
+  const { data, error } = await db
+    .from('profiles')
+    .select('id, nickname, role')
+    .in('role', ['curator', 'admin']);
+
+  if (error) fail(`큐레이터를 찾지 못했습니다: ${error.message}`);
+  if (data.length === 0) {
+    fail('큐레이터가 없습니다. profiles.role을 curator로 올린 뒤 다시 실행하세요');
+  }
+  if (data.length > 1) {
+    const list = data.map((r) => `    ${r.id}  ${r.nickname ?? ''}`).join('\n');
+    fail(`큐레이터가 여럿입니다. --reviewer=<uuid>로 고르세요:\n${list}`);
+  }
+
+  return data[0].id;
 }
 
 async function loadPlace(id) {
@@ -141,6 +204,7 @@ if (kind === 'report') {
   const { error: rpcError } = await db.rpc('approve_place_report', {
     p_report_id: id,
     p_place_id: placeId,
+    p_reviewer: await resolveReviewer(),
   });
   if (rpcError) fail(`승인하지 못했습니다: ${rpcError.message}`);
 
@@ -166,7 +230,10 @@ if (kind === 'report') {
 
   // 카페 정보 자체(영업시간·가격 등)는 사람이 고친다. 이 함수는 확인일을 오늘로
   // 옮기고 요청을 approved로 표시할 뿐이다.
-  const { error: rpcError } = await db.rpc('approve_edit_request', { p_request_id: id });
+  const { error: rpcError } = await db.rpc('approve_edit_request', {
+    p_request_id: id,
+    p_reviewer: await resolveReviewer(),
+  });
   if (rpcError) fail(`승인하지 못했습니다: ${rpcError.message}`);
 
   console.log('✅ 승인 완료 — 카페 정보 자체를 고쳤는지 다시 확인하세요');

@@ -134,11 +134,45 @@ begin
 exception when raise_exception then raise notice 'OK: %', sqlerrm;
 end $$;
 
-set local test.uid = '11111111-1111-1111-1111-111111111111';
+\echo '-- 세션 없이 온 service_role은 승인자를 인자로 지정할 수 있다'
+-- 파일 이동이 Storage API를 거쳐야 해서 운영 스크립트가 service_role로 돈다.
+-- 그때 auth.uid()는 NULL이므로 이 경로가 없으면 승인이 영영 통과하지 못한다.
+set local test.uid = '';
+set local test.role = 'service_role';
+do $$
+begin
+  perform public.approve_place_report(
+    (select id from public.place_reports limit 1),
+    (select id from public.places where naver_place_url = 'https://naver.me/testReport'),
+    '22222222-2222-2222-2222-222222222222');  -- 큐레이터가 아닌 사람
+  raise exception 'FAIL: 비큐레이터를 승인자로 지정했다';
+exception when raise_exception then raise notice 'OK: %', sqlerrm;
+end $$;
+
+\echo '-- 로그인한 비큐레이터는 인자로 남을 사칭할 수 없다'
+set local test.uid = '22222222-2222-2222-2222-222222222222';
+set local test.role = 'authenticated';
+do $$
+begin
+  perform public.approve_place_report(
+    (select id from public.place_reports limit 1),
+    (select id from public.places where naver_place_url = 'https://naver.me/testReport'),
+    '11111111-1111-1111-1111-111111111111');  -- 큐레이터 uuid를 넣어도
+  raise exception 'FAIL: 사칭이 통했다';
+exception when raise_exception then raise notice 'OK: %', sqlerrm;
+end $$;
+
+set local test.uid = '';
+set local test.role = 'service_role';
 select public.approve_place_report(
-         (select id from public.place_reports limit 1), :'new_place_id');
+         (select id from public.place_reports limit 1), :'new_place_id',
+         '11111111-1111-1111-1111-111111111111');
+set local test.role = '';
 \echo '-- 승인되면 제보가 등록된 카페를 가리킨다'
-select status, place_id = :'new_place_id' as linked, reviewed_at is not null as reviewed
+select status,
+       place_id = :'new_place_id' as linked,
+       reviewed_at is not null    as reviewed,
+       reviewed_by = '11111111-1111-1111-1111-111111111111' as reviewer_recorded
   from public.place_reports;
 
 \echo '=== 9. 정보 수정 요청 → 승인 ==='

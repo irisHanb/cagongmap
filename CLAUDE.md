@@ -193,9 +193,14 @@ Supabase 클라이언트가 셋이다. **역할이 달라서 나눈 것이지 �
 - **승인 함수는 카페를 만들지도 고치지도 않는다.** 두 테이블 어느 쪽도 `places`를 채울
   만큼의 정보를 담지 않기 때문이다(제보는 URL·사진·메모, 수정 요청은 사진·메모).
   큐레이터가 `places`를 직접 만들거나 고친 뒤 함수로 연결·기록만 한다.
-  - `approve_place_report(제보id, 카페id)` — 만든 카페에 연결하고 `approved`로.
-  - `approve_edit_request(요청id)` — `places.last_verified`를 오늘로 옮기고 `approved`로.
-  - `reject_place_report(id, 사유)` / `reject_edit_request(id, 사유)`
+  - `approve_place_report(제보id, 카페id, 승인자uuid?)` — 만든 카페에 연결하고 `approved`로.
+  - `approve_edit_request(요청id, 승인자uuid?)` — `places.last_verified`를 오늘로 옮긴다.
+  - `reject_place_report(id, 사유, 승인자uuid?)` / `reject_edit_request(id, 사유, 승인자uuid?)`
+- ⚠️ **service_role로 부를 때는 승인자를 인자로 넘겨야 한다.** service_role 키의 JWT에는
+  `sub` 클레임이 없어 `auth.uid()`가 NULL이고, 그러면 `is_curator()`가 false다 — 인자가
+  없던 시절 운영 스크립트의 승인은 **한 번도 성공할 수 없었다.** 판정은
+  `resolve_reviewer()` 한 곳에 있고 `coalesce(auth.uid(), …)` 순서라, 로그인한
+  비큐레이터가 인자로 남을 사칭하는 경로는 열리지 않는다.
 - **신규 제보는 그것만으로 카페가 되지 않는다.** 폼이 그 사실을 사용자에게 말한다.
 - **storage 마이그레이션에서 `alter table ... enable row level security`와 `grant`를 쓰지
   않는다.** 이미 켜져 있고 이미 grant돼 있으며, `alter table`은 소유자만 되므로 깨진다.
@@ -228,15 +233,20 @@ Supabase 클라이언트가 셋이다. **역할이 달라서 나눈 것이지 �
   | `submissions/<uid>/<uuid>.jpg` | 검수 전 제보 사진 | 본인만 (storage 정책) |
   | `<slug>/<uuid>.jpg` | 승인된 카페 사진 | service_role 스크립트만 |
 
-- ⚠️ **공개 버킷이므로 검수 전 사진도 URL을 안다면 열린다.** 대신 로그인 사용자는
-  자기 `submissions/<uid>/` 아래에만 쓸 수 있고, 버킷에 5MB·이미지 3종 제한이 걸려
-  있다. 그 둘이 방어선이다.
+- ⚠️ **공개 버킷이므로 검수 전 사진도 URL을 안다면 열린다.** 방어선은 셋이다 —
+  로그인 사용자는 자기 `submissions/<uid>/` 아래에만 쓸 수 있고, 버킷에 5MB·이미지 3종
+  제한이 있고, **폴더당 20장 상한**을 storage 정책이 `submission_photo_count()`로 건다.
+  개수 상한이 없으면 `MAX_PHOTOS`가 클라이언트에만 있는 셈이라(anon 키는 브라우저에
+  나간다) 공개 버킷이 무한 업로드 대상이 된다.
 - **`submission-images`(비공개) 버킷은 폐기됐다.** 2026-08-20 오전에 잠깐 있었다.
   **storage 테이블은 SQL로 지울 수 없으므로**(`storage.protect_delete`가 막는다)
   버킷을 없애는 것은 대시보드나 Storage API로만 된다. 마이그레이션으로 지우려 하지 말 것.
 - **승인은 `scripts/approve-submission.mjs`로 한다.** 파일 이동은 Postgres가 못 하기
   때문이다(`storage.objects`의 name만 바꾸면 실제 오브젝트와 어긋난다). 스크립트가
   경로를 옮기고 `places.photos`에 붙인 뒤 승인 함수를 부른다 — **순서가 중요하다.**
+  각 단계는 **다시 돌려도 괜찮아야 한다**: 옮기기 전에 목적지를 보고 이미 있으면
+  건너뛰고, `places.photos`에도 중복으로 붙이지 않는다. 그래야 승인에서 실패한 뒤
+  재시도할 수 있다.
 
   ```bash
   node --env-file=.env.local scripts/approve-submission.mjs report <report-id> <place-id>
@@ -261,7 +271,8 @@ Supabase 클라이언트가 셋이다. **역할이 달라서 나눈 것이지 �
 
   참조되는 파일은 건드리지 않고, 올라온 지 60분이 안 된 파일도 남긴다(폼이 열려 있을
   수 있다). **storage 테이블은 SQL로 못 지우므로**(`storage.protect_delete`) 이 경로나
-  대시보드뿐이다.
+  대시보드뿐이다. 참조 목록과 파일 목록은 **끝까지 페이지를 넘겨 읽는다** — 중간에
+  잘리면 참조되는 사진을 고아로 오인한다.
 
 ### 카카오맵 SDK 통합
 

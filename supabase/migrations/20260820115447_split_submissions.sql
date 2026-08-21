@@ -377,14 +377,23 @@ grant  execute on function public.reject_edit_request(uuid, text)  to authentica
 do $$
 declare v_stuck int;
 begin
+  -- 새 테이블의 제약에 걸릴 행을 **미리** 전부 센다. 하나라도 남기면 아래 insert가
+  -- raw 제약 오류로 죽어서, 무엇을 손봐야 하는지 알 수 없는 메시지만 남는다.
   select count(*) into v_stuck
-    from public.place_submissions
-   where kind = 'closed'
-      or (kind = 'new' and payload->>'naver_place_url' is null);
+    from public.place_submissions s
+   where s.kind = 'closed'
+      -- 신규: 네이버 URL이 없거나 https 형식이 아니면 place_reports가 거부한다
+      or (s.kind = 'new'
+          and coalesce(s.payload ->> 'naver_place_url', '') !~ '^https://\S+$')
+      -- 수정: 대상이 없으면 not null에, 사진도 메모도 없으면 has_content에 걸린다
+      or (s.kind = 'edit'
+          and (s.place_id is null
+               or (coalesce(jsonb_array_length(s.payload -> 'photo_paths'), 0) = 0
+                   and coalesce(btrim(s.note), '') = '')));
 
   if v_stuck > 0 then
     raise exception
-      '옮길 수 없는 제보 %건이 있습니다 (폐업 신고이거나 네이버 URL이 없는 신규 제보). 손으로 처리한 뒤 다시 실행하세요',
+      '옮길 수 없는 제보 %건이 있습니다 (폐업 신고 / 네이버 URL이 없거나 형식이 틀린 신규 제보 / 대상이나 내용이 없는 수정 요청). 손으로 처리한 뒤 다시 실행하세요',
       v_stuck;
   end if;
 end $$;

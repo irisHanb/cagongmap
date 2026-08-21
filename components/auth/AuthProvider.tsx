@@ -38,6 +38,9 @@ interface AuthState {
    * 부르는 쪽은 `if (!requireLogin('review')) return;` 한 줄로 끝난다. 판정을
    * 버튼마다 두지 않으려고 여기에 모았다 — 원래 BookmarkProvider.toggle()에
    * 있던 것을, 로그인이 필요한 자리가 셋(북마크·리뷰·제보)이 되면서 올렸다.
+   *
+   * 세션 판정 전에는 false를 돌려주되 모달도 띄우지 않는다. 그 짧은 사이의 클릭은
+   * 조용히 무시되며, 잘못된 안내를 보여주는 것보다 낫다.
    */
   requireLogin: (reason: LoginReason) => boolean;
   /** 지금 띄워야 하는 로그인 안내. 없으면 null */
@@ -121,11 +124,15 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
   const requireLogin = useCallback(
     (reason: LoginReason) => {
+      // 판정 전에는 아무 일도 하지 않는다. 여기서 모달을 띄우면 이미 로그인한
+      // 사람이 세션 복구 중에 누른 순간 "로그인이 필요해요"를 보게 된다 —
+      // dock의 제보 버튼과 리뷰 chip은 AuthDock과 달리 첫 페인트부터 떠 있다.
+      if (!resolved) return false;
       if (user) return true;
       setLoginPrompt(reason);
       return false;
     },
-    [user],
+    [resolved, user],
   );
 
   const dismissLoginPrompt = useCallback(() => setLoginPrompt(null), []);

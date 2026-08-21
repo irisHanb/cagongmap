@@ -7,7 +7,7 @@ import PhotoPicker from './PhotoPicker';
 import SubmissionModal from './SubmissionModal';
 
 /**
- * 기존 카페 수정 요청 (place_submissions kind='edit').
+ * 기존 카페 수정 요청 (place_edit_requests).
  *
  * 받는 것은 사진과 메모뿐이다. 콘센트·소음 같은 구조화된 필드를 폼에 늘어놓지
  * 않는 이유는, 그 값들이 운영자가 직접 확인해 매기는 핵심 자산이기 때문이다

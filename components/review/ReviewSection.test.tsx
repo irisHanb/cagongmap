@@ -18,10 +18,32 @@ interface State {
   counts: { good: number; normal: number; bad: number };
   mine: string | null;
   fail: boolean;
+  /** 내 평가 조회를 늦춘다 — 클릭이 먼저 일어나는 상황을 만들기 위한 것 */
+  mineDelayMs: number;
 }
 
-const state: State = { userId: null, counts: { good: 0, normal: 0, bad: 0 }, mine: null, fail: false };
+const state: State = {
+  userId: null,
+  counts: { good: 0, normal: 0, bad: 0 },
+  mine: null,
+  fail: false,
+  mineDelayMs: 0,
+};
 const calls: string[] = [];
+
+/**
+ * 가짜 서버의 저장 규칙. 화면이 낙관적으로 계산한 값과 **따로** 움직여야
+ * "요청이 끝난 뒤 서버 집계로 맞춘다"를 검증할 수 있다.
+ */
+function applyOnServer(next: string | null) {
+  if (state.mine) {
+    state.counts[state.mine as 'good' | 'normal' | 'bad'] -= 1;
+  }
+  state.mine = next;
+  if (next) {
+    state.counts[next as 'good' | 'normal' | 'bad'] += 1;
+  }
+}
 
 /**
  * supabase-js의 쿼리 빌더는 체이닝 끝에서 await된다(thenable). 그 모양만
@@ -46,7 +68,7 @@ vi.mock('@/lib/supabase-browser', () => ({
       }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
     },
-    rpc: async () => ({ data: [state.counts], error: null }),
+    rpc: async () => ({ data: [{ ...state.counts }], error: null }), // 호출 시점 스냅샷
     from: (table: string) => {
       if (table === 'places') {
         return builder(() => ({ data: { id: 'place-uuid' }, error: null }));
@@ -56,13 +78,24 @@ vi.mock('@/lib/supabase-browser', () => ({
       const self: Record<string, unknown> = {
         select: () => self,
         eq: () => self,
-        maybeSingle: async () => ({ data: state.mine ? { value: state.mine } : null, error: null }),
+        maybeSingle: async () => {
+          // **호출 시점의 값을 찍어 둔다.** 늦게 도착하는 응답은 그 사이에 일어난
+          // 쓰기를 모르는 옛 값이다 — 그 상황을 재현하려면 지연 뒤에 현재 상태를
+          // 읽으면 안 된다.
+          const snapshot = state.mine;
+          if (state.mineDelayMs > 0) {
+            await new Promise((resolve) => setTimeout(resolve, state.mineDelayMs));
+          }
+          return { data: snapshot ? { value: snapshot } : null, error: null };
+        },
         upsert: (row: { value: string }) => {
           calls.push(`upsert:${row.value}`);
+          if (!state.fail) applyOnServer(row.value);
           return { then: (resolve: (v: unknown) => unknown) => resolve(fail()) };
         },
         delete: () => {
           calls.push('delete');
+          if (!state.fail) applyOnServer(null);
           return self;
         },
         then: (resolve: (v: unknown) => unknown) => resolve(fail()),
@@ -92,6 +125,7 @@ beforeEach(() => {
   state.counts = { good: 0, normal: 0, bad: 0 };
   state.mine = null;
   state.fail = false;
+  state.mineDelayMs = 0;
   calls.length = 0;
 });
 
@@ -140,6 +174,10 @@ describe('ReviewSection', () => {
     expect(screen.getByRole('button', { name: '좋아요' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByText('좋아요 2 · 보통 1 · 별로 0')).toBeInTheDocument();
     expect(calls).toEqual(['upsert:good']);
+
+    // 요청이 끝나면 서버 집계로 다시 맞춘다. 같은 값이어야 한다.
+    await waitFor(() => expect(state.mine).toBe('good'));
+    expect(await screen.findByText('좋아요 2 · 보통 1 · 별로 0')).toBeInTheDocument();
   });
 
   it('같은 값을 다시 누르면 해제하고 집계를 되돌린다', async () => {
@@ -161,7 +199,7 @@ describe('ReviewSection', () => {
 
     expect(screen.getByRole('button', { name: '좋아요' })).toHaveAttribute('aria-pressed', 'false');
     expect(calls).toEqual(['delete']);
-    expect(screen.getByText('아직 평가가 없어요. 첫 평가를 남겨보세요')).toBeInTheDocument();
+    expect(await screen.findByText('아직 평가가 없어요. 첫 평가를 남겨보세요')).toBeInTheDocument();
   });
 
   it('평가를 바꾸면 한쪽이 줄고 다른 쪽이 는다', async () => {
@@ -180,7 +218,7 @@ describe('ReviewSection', () => {
 
     await user.click(screen.getByRole('button', { name: '별로' }));
 
-    expect(screen.getByText('좋아요 0 · 보통 1 · 별로 1')).toBeInTheDocument();
+    expect(await screen.findByText('좋아요 0 · 보통 1 · 별로 1')).toBeInTheDocument();
     expect(calls).toEqual(['upsert:bad']);
   });
 
@@ -200,5 +238,28 @@ describe('ReviewSection', () => {
       ),
     );
     expect(screen.getByText('평가를 남기지 못했습니다: 저장 실패')).toBeInTheDocument();
+  });
+
+  it('내 평가 조회가 늦게 도착해도 방금 누른 것을 덮지 않는다', async () => {
+    // 조회가 클릭보다 늦으면 예전 값으로 되돌려 버리던 버그. effect의 의존성은
+    // 클릭으로 바뀌지 않으므로 cleanup의 cancelled로는 막지 못한다.
+    state.userId = 'user-1';
+    state.mine = 'bad';
+    state.counts = { good: 0, normal: 0, bad: 1 };
+    state.mineDelayMs = 40;
+    const user = userEvent.setup();
+    renderSection();
+
+    // 조회가 끝나기 전에 누른다.
+    await user.click(await screen.findByRole('button', { name: '좋아요' }));
+    expect(screen.getByRole('button', { name: '좋아요' })).toHaveAttribute('aria-pressed', 'true');
+
+    // 늦게 도착한 응답이 지나가도 선택이 유지되고,
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(screen.getByRole('button', { name: '좋아요' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '별로' })).toHaveAttribute('aria-pressed', 'false');
+
+    // 집계도 서버 값과 어긋나지 않는다 (낙관적 계산만 믿으면 bad가 1로 남는다).
+    expect(await screen.findByText('좋아요 1 · 보통 0 · 별로 0')).toBeInTheDocument();
   });
 });

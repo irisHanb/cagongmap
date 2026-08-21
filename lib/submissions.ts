@@ -180,12 +180,15 @@ export interface SubmissionInput {
  * 우리가 만들어 주는 셈이다.
  */
 export async function submitEdit(cafeId: string, { files, note }: SubmissionInput): Promise<void> {
+  // 사진보다 먼저 푼다. insert 인자 안에서 풀면 여기서 던졌을 때 아래 rollback을
+  // 지나치지 못하고 빠져나가, 방금 올린 사진이 주인 없이 남는다.
+  const placeId = await resolvePlaceId(cafeId);
   const photos = await uploadPhotos(files);
 
   const { error } = await getBrowserSupabase()
     .from('place_edit_requests')
     .insert({
-      place_id: await resolvePlaceId(cafeId),
+      place_id: placeId,
       photos,
       note: note.trim() || null,
     });

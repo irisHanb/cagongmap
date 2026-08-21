@@ -59,22 +59,61 @@ function toPath(value) {
   return at === -1 ? value : value.slice(at + PUBLIC_MARKER.length);
 }
 
-/** 제보가 가리키는 경로 전부. 이 목록에 있으면 절대 지우지 않는다. */
+const PAGE = 500;
+
+/**
+ * 제보가 가리키는 경로 전부. 이 목록에 있으면 절대 지우지 않는다.
+ *
+ * **끝까지 읽어야 한다.** PostgREST는 기본적으로 최대 1000행만 돌려주는데, 여기서
+ * 잘리면 참조되는 사진이 고아로 보인다 — 이 스크립트의 안전 논리가 통째로 무너진다.
+ * 그래서 range로 끝까지 넘긴다.
+ */
 async function referencedPaths() {
   const referenced = new Set();
 
   for (const table of ['place_reports', 'place_edit_requests']) {
-    const { data, error } = await db.from(table).select('photos');
-    if (error) {
-      console.error(`✗ ${table}를 읽지 못했습니다: ${error.message}`);
-      process.exit(1);
-    }
-    for (const row of data) {
-      for (const photo of row.photos ?? []) referenced.add(toPath(photo));
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await db
+        .from(table)
+        .select('photos')
+        .order('created_at', { ascending: true })
+        .range(from, from + PAGE - 1);
+
+      if (error) {
+        console.error(`✗ ${table}를 읽지 못했습니다: ${error.message}`);
+        process.exit(1);
+      }
+
+      for (const row of data) {
+        for (const photo of row.photos ?? []) referenced.add(toPath(photo));
+      }
+
+      if (data.length < PAGE) break;
     }
   }
 
   return referenced;
+}
+
+/** 한 폴더를 끝까지 훑는다. list()도 한 번에 돌려주는 개수가 제한돼 있다. */
+async function listAll(prefix) {
+  const all = [];
+
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await db.storage
+      .from(BUCKET)
+      .list(prefix, { limit: PAGE, offset });
+
+    if (error) {
+      console.error(`✗ ${prefix}를 훑지 못했습니다: ${error.message}`);
+      process.exit(1);
+    }
+
+    all.push(...data);
+    if (data.length < PAGE) break;
+  }
+
+  return all;
 }
 
 /**
@@ -85,24 +124,13 @@ async function referencedPaths() {
 async function listSubmissionFiles() {
   const files = [];
 
-  const { data: owners, error } = await db.storage.from(BUCKET).list(PREFIX, { limit: 1000 });
-  if (error) {
-    console.error(`✗ 버킷을 훑지 못했습니다: ${error.message}`);
-    process.exit(1);
-  }
+  const owners = await listAll(PREFIX);
 
   for (const owner of owners) {
     // 폴더는 id가 null로 온다. 파일이 바로 놓여 있으면 규칙에 어긋나므로 건너뛴다.
     if (owner.id !== null) continue;
 
-    const { data: entries, error: listError } = await db.storage
-      .from(BUCKET)
-      .list(`${PREFIX}/${owner.name}`, { limit: 1000 });
-
-    if (listError) {
-      console.error(`✗ ${owner.name} 폴더를 훑지 못했습니다: ${listError.message}`);
-      process.exit(1);
-    }
+    const entries = await listAll(`${PREFIX}/${owner.name}`);
 
     for (const entry of entries) {
       if (entry.id === null) continue;

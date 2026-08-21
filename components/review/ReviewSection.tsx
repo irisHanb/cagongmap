@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Cafe } from '@/types/cafe';
 import {
   applyToCounts,
@@ -38,6 +38,15 @@ export default function ReviewSection({ cafe }: { cafe: Cafe }) {
    */
   const [loaded, setLoaded] = useState<{ userId: string; value: ReviewValue | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * 한 번이라도 눌렀는가.
+   *
+   * 첫 조회가 클릭보다 늦게 도착하면 낙관적으로 바꿔 둔 값을 옛 값으로 되돌려 버린다.
+   * effect의 의존성(cafe.id·user·authResolved)은 클릭으로 바뀌지 않으므로 cleanup의
+   * cancelled로는 막지 못한다. 누른 뒤로는 서버가 답을 줘도 화면을 되돌리지 않고,
+   * 대신 요청이 끝난 뒤 집계를 다시 받아 맞춘다.
+   */
+  const touched = useRef(false);
 
   const mine = user && loaded?.userId === user.id ? loaded.value : null;
 
@@ -47,7 +56,7 @@ export default function ReviewSection({ cafe }: { cafe: Cafe }) {
 
     getReviewCounts(cafe.id)
       .then((next) => {
-        if (!cancelled) setCounts(next);
+        if (!cancelled && !touched.current) setCounts(next);
       })
       .catch((e: Error) => {
         if (!cancelled) setError(e.message);
@@ -66,7 +75,7 @@ export default function ReviewSection({ cafe }: { cafe: Cafe }) {
 
     getMyReview(cafe.id)
       .then((value) => {
-        if (!cancelled) setLoaded({ userId, value });
+        if (!cancelled && !touched.current) setLoaded({ userId, value });
       })
       .catch((e: Error) => {
         if (!cancelled) setError(e.message);
@@ -88,16 +97,27 @@ export default function ReviewSection({ cafe }: { cafe: Cafe }) {
     const after = before === value ? null : value;
 
     // 낙관적으로 먼저 반영한다. 누른 즉시 반응해야 하고, 실패하면 되돌린다.
+    touched.current = true;
     setError(null);
     setLoaded({ userId, value: after });
     setCounts((prev) => (prev ? applyToCounts(prev, before, after) : prev));
 
     const request = after ? setReview(cafe.id, after) : clearReview(cafe.id);
-    request.catch((e: Error) => {
-      setLoaded((prev) => (prev?.userId === userId ? { userId, value: before } : prev));
-      setCounts((prev) => (prev ? applyToCounts(prev, after, before) : prev));
-      setError(e.message);
-    });
+    request
+      .then(() => {
+        // 서버 집계로 맞춘다. 내 평가를 아직 못 받은 채 눌렀다면 before가 null이라
+        // 낙관적 증감이 한쪽으로 치우쳐 있을 수 있다 — 그 어긋남이 여기서 사라진다.
+        getReviewCounts(cafe.id)
+          .then(setCounts)
+          .catch(() => {
+            // 집계를 다시 못 받아도 화면은 낙관적 값으로 돌아간다. 조용히 둔다.
+          });
+      })
+      .catch((e: Error) => {
+        setLoaded((prev) => (prev?.userId === userId ? { userId, value: before } : prev));
+        setCounts((prev) => (prev ? applyToCounts(prev, after, before) : prev));
+        setError(e.message);
+      });
   };
 
   return (

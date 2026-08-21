@@ -31,8 +31,16 @@ export default function PhotoPicker({
   /** 드래그가 영역 위에 올라와 있는가 — 테두리 하나만 바뀐다 */
   const [over, setOver] = useState(false);
 
-  // 파일이 바뀔 때만 새로 만들고, 바뀌면 이전 것을 반드시 놓아준다.
-  // revoke를 빠뜨리면 사진을 고를 때마다 blob이 메모리에 쌓인다.
+  /**
+   * 미리보기 blob URL. 파일이 바뀔 때만 새로 만들고, 바뀌면 이전 것을 놓아준다.
+   * revoke를 빠뜨리면 사진을 고를 때마다 blob이 메모리에 쌓인다.
+   *
+   * ⚠️ 알고 두는 한계: **개발 모드(StrictMode)에서는 렌더가 두 번 돌아 한 벌이
+   * 회수되지 못한다.** 프로덕션 렌더는 한 번이라 실제 사용자에게는 생기지 않는다.
+   * 더 나은 모양 둘은 이 저장소의 린트가 막는다 — effect 안에서 setState하는 것도
+   * (cascading render), 렌더 중 ref를 읽는 것도 금지다. 지금은 이 한계를 적어 두는
+   * 편을 택했다.
+   */
   const previews = useMemo(() => files.map((file) => URL.createObjectURL(file)), [files]);
 
   useEffect(() => {

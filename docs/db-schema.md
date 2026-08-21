@@ -210,8 +210,20 @@ select public.approve_place_report('<report id>', '<방금 만든 place id>');
 select public.approve_edit_request('<request id>');   -- last_verified를 오늘로 옮긴다
 ```
 
-- `reject_place_report(uuid, text)` / `reject_edit_request(uuid, text)`: 반려 + 사유.
-- 넷 다 `security definer`이고 `is_curator()`로 먼저 막는다. `authenticated`에만 grant.
+- `reject_place_report(uuid, text, uuid)` / `reject_edit_request(uuid, text, uuid)`: 반려 + 사유.
+- 넷 다 `security definer`이고 `resolve_reviewer()`로 먼저 막는다. `authenticated`에만 grant.
+
+**세 번째 인자(`p_reviewer`)가 있는 이유.** service_role 키의 JWT에는 `sub` 클레임이 없어
+`auth.uid()`가 NULL이다. 파일 이동 때문에 운영 스크립트가 service_role로 도는데, 인자가
+없으면 `is_curator(NULL)` = false라 **승인이 영영 통과하지 못한다.**
+
+```sql
+v_reviewer := coalesce(auth.uid(), case when auth.role() = 'service_role' then p_reviewer end);
+```
+
+순서가 방어선이다 — 세션이 있으면 무조건 그 사람이므로, 로그인한 비큐레이터가 인자에
+큐레이터 uuid를 넣어도 자기 uid로 판정돼 막힌다. (`current_user`로는 판정할 수 없다.
+`security definer` 안에서는 소유자로 바뀐다.)
 
 ---
 
@@ -269,8 +281,12 @@ SQL로 못 한다** — `storage.protect_delete` 트리거가 storage 테이블 
 
 - 대가: **검수 전 사진도 URL을 알면 열린다.** 파일명이 uuid라 추측은 어렵지만 인증이
   필요하지 않다는 뜻이다.
-- 방어선 둘: 사용자는 `submissions/<본인 uid>/` 아래에만 쓸 수 있고, 버킷에 5MB·
-  이미지 3종 제한이 걸려 있다. **카페 사진 자리(`<slug>/`)에는 직접 못 쓴다.**
+- 방어선 셋: 사용자는 `submissions/<본인 uid>/` 아래에만 쓸 수 있고(**카페 사진 자리
+  `<slug>/`에는 직접 못 쓴다**), 버킷에 5MB·이미지 3종 제한이 있고, 폴더당 **20장 상한**을
+  정책이 `submission_photo_count()`로 건다. 개수 상한이 빠져 있던 동안에는
+  `MAX_PHOTOS = 5`가 클라이언트에만 있어 공개 버킷이 무한 업로드 대상이었다.
+  세는 함수를 `security definer`로 둔 것은 SELECT 정책을 새로 열지 않으려는 것이다 —
+  소유자(`postgres`)가 `bypassrls`라 정책과 무관하게 셀 수 있다.
 - `SELECT` 정책은 만들지 않았다. 공개 버킷이라 읽기는 정책이 아니라 공개 URL로
   이뤄진다 — 정책을 만들면 통제하고 있다는 인상만 준다.
 - `UPDATE` 정책도 없다(파일마다 새 uuid를 쓰므로 덮어쓸 일이 없다).
@@ -317,7 +333,8 @@ supabase db push          # 스키마 + 카페 9곳 + 북마크
 | 가입 시 `profiles` 자동 생성, 본인 `role` 승격 차단 | 통과 |
 | 새 장소 제보 → 승인, 등록된 카페와 연결 (비큐레이터 승인 거부 포함) | 통과 |
 | 수정 요청 → 승인, `last_verified`가 오늘로 이동 | 통과 |
-| `photos`에 URL·공백 차단(세 테이블 공통), 내용 없는 수정 요청 차단 | 통과 |
+| `photos`에 URL·공백 차단(`places`), 제보 쪽은 공개 URL 형식 강제, 내용 없는 수정 요청 차단 | 통과 |
+| 비큐레이터 승인 거부 · service_role의 승인자 지정 · 로그인 사용자의 사칭 차단 | 통과 |
 | 시드 9곳의 사진이 URL이 아니라 경로로 저장돼 있음 | 통과 |
 | 제보 사진은 `submissions/<본인 uid>/`에만, 카페 사진 자리(`<slug>/`)에는 못 씀 | 통과 |
 | 대기 중 요청은 대상당 하나 (부분 unique 인덱스) | 통과 |

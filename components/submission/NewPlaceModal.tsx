@@ -8,7 +8,7 @@ import PhotoPicker from './PhotoPicker';
 import SubmissionModal from './SubmissionModal';
 
 /**
- * 새 장소 제보 (place_submissions kind='new').
+ * 새 장소 제보 (place_reports).
  *
  * 받는 것은 네이버 URL·사진·메모뿐이다. 이름·주소·좌표·영업시간은 받지 않는다 —
  * places는 그 넷이 not null이라 이 제보만으로는 승인이 되지 않지만, 그 값들을

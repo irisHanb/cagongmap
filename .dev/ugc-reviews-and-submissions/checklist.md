@@ -53,10 +53,23 @@
 - [x] AC11 남의 uid 폴더나 카페 사진 자리(`<slug>/`)로 insert하면 storage 정책이 막는다
 - [ ] AC12 `approve-submission.mjs`가 사진을 옮기고 제보를 `approved`로 만든다 — **미확인**(승인할 제보를 아직 처리하지 않았다)
 - [ ] AC12-1 제출이 실패하면 방금 올린 사진이 버킷에 남지 않는다 — **단위 테스트만 통과**, 실제 중복 제출로는 미확인
-- [x] AC13 `npm run verify` 통과 (74 테스트, warning 0)
+- [x] AC13 `npm run verify` 통과 (75 테스트, warning 0)
 - [x] AC14 `./scripts/verify-schema.sh`가 `✅ 통과`로 끝난다
 - [x] AC15 `npm run build`에서 `/` 라우트가 정적 렌더를 유지한다
 - [x] AC16 `docs/scope.md`·`DESIGN.md`·`docs/db-schema.md`·`CLAUDE.md`가 갱신돼 있다
+
+## 코드 리뷰 후속 (2026-08-20)
+
+- [x] F1 승인 함수에 `p_reviewer` 추가 — service_role은 `auth.uid()`가 NULL이라 승인이 통과할 수 없었다 (req: R24-2)
+- [x] F2 `ReviewSection` 조회 경합 — 누른 뒤 도착한 응답을 무시하고, 요청 후 서버 집계로 맞춘다 (req: R5-1)
+- [x] F3 업로드 개수 상한을 storage 정책으로 (`submission_photo_count() < 20`) (req: R7-1)
+- [x] F4 `requireLogin`이 `resolved`를 본다 (req: R19-1)
+- [x] F5 `prune-orphan-photos.mjs` 페이지네이션 — 1000행에서 잘리면 참조된 사진을 고아로 오인한다
+- [x] F6 `submitEdit`의 `resolvePlaceId`를 업로드보다 먼저 — 거기서 던지면 롤백을 지나쳤다
+- [x] F7 `split_submissions` 사전 점검이 놓치던 행(내용 없는 수정 요청, 대상 없는 수정 요청, 형식 틀린 URL)
+- [x] F8 `approve-submission.mjs`를 재시도 가능하게 — 목적지에 이미 있으면 건너뛰고 photos도 중복으로 붙이지 않는다
+- [x] F9 모달 주석의 `kind='edit'` / `kind='new'` 잔재 제거
+- [x] F10 위 셋(F1·F2·F3)에 대한 검증 추가 — 스키마 테스트 3케이스, 경합 회귀 테스트 1개(수정을 되돌리면 실패하는 것을 확인)
 
 ## Human Checks
 
@@ -66,4 +79,4 @@
 - [ ] `places`에 카페를 만든 뒤 `approve-submission.mjs report <제보id> <카페id>` 실행 (AC12)
 - [x] 리뷰 버튼 색 확인 — `good`에만 민트 (AC5)
 - [ ] 폐기된 `submission-images` 버킷을 대시보드에서 삭제 (SQL로는 `storage.protect_delete`가 막는다)
-- [ ] `supabase db push`가 아홉 개 마이그레이션을 순서대로 통과하는지 (원격에는 MCP로 이미 적용됨)
+- [ ] `supabase db push`가 열 개 마이그레이션을 순서대로 통과하는지 (원격에는 MCP로 이미 적용됨)
