@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import Link from 'next/link';
+import { useCallback, useRef, useState } from 'react';
 import type { Cafe } from '@/types/cafe';
 import AuthDock from '@/components/auth/AuthDock';
 import AuthProvider, { useAuth } from '@/components/auth/AuthProvider';
@@ -12,6 +13,7 @@ import EditRequestModal from '@/components/submission/EditRequestModal';
 import NewPlaceModal from '@/components/submission/NewPlaceModal';
 import CafeMarkers from './CafeMarkers';
 import KakaoMap from './KakaoMap';
+import MapCenterInset from './MapCenterInset';
 
 /** 송리단길 일대 — 송파·잠실 권역 기준점 (docs/scope.md) */
 const INITIAL_CENTER = { lat: 37.5078, lng: 127.1072 };
@@ -42,6 +44,8 @@ function MapShell({ cafes }: { cafes: Cafe[] }) {
   /** 열려 있는 폼 모달. 로그인 유도와 달리 화면당 하나로 제한할 이유가 없어 따로 둔다 */
   const [form, setForm] = useState<'edit' | 'new' | null>(null);
   const { loginPrompt, dismissLoginPrompt, requireLogin } = useAuth();
+  // dock이 지도 중심을 가리는지 재려면 실제 크기가 필요하다 (MapCenterInset).
+  const dockRef = useRef<HTMLDivElement>(null);
 
   // CafeMarker의 useEffect 의존성으로 들어가므로 참조를 고정한다.
   const handleSelect = useCallback((cafe: Cafe) => setSelected(cafe), []);
@@ -61,6 +65,8 @@ function MapShell({ cafes }: { cafes: Cafe[] }) {
   return (
     <main className={`map-view${selected ? ' map-view--detail' : ''}`}>
       <KakaoMap center={INITIAL_CENTER} level={5}>
+        {/* 좁은 화면에서 dock 뒤에 깔리는 중심을 보이는 자리로 내린다 */}
+        <MapCenterInset obstructionRef={dockRef} />
         <CafeMarkers
           cafes={cafes}
           selectedId={selected?.id ?? null}
@@ -71,10 +77,17 @@ function MapShell({ cafes }: { cafes: Cafe[] }) {
       {/* 탐색 결과를 늘어놓는 곳이 아니라 지도 탐색을 시작하는 dock이다.
           DESIGN.md Left Panel 순서의 1-3번, 5번, 6번이 여기 있다.
           4번 검색바만 아직 스코프 밖이라 자리를 만들지 않았다. */}
-      <div className="brand-dock">
+      <div className="brand-dock" ref={dockRef}>
         <p className="eyebrow">WORK CAFE MAP</p>
         <h1>카공맵</h1>
-        <p className="brand-dock__sub">오래 앉아 작업하기 좋은 카페 {cafes.length}곳</p>
+        <p className="brand-dock__sub">
+          오래 앉아 작업하기 좋은 카페 {cafes.length}곳{' '}
+          {/* 목록은 지도의 대체가 아니라 크롤러와 사람 둘 다를 위한 읽는 화면이다.
+              CTA로 키우지 않는다 — dock의 주인공은 지도다 (DESIGN.md Cafe List Page). */}
+          <Link href="/cafes" className="brand-dock__list-link">
+            목록으로 보기
+          </Link>
+        </p>
         <AuthDock />
         {/* 로그인 전에도 보인다 — 제보할 수 있다는 사실 자체가 로그인의 이유다.
             누르면 저장 대신 로그인 모달이 뜬다 (상세 하트와 같은 규칙). */}

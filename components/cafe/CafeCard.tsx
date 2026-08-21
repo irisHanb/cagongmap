@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import type { Cafe } from '@/types/cafe';
-import { NOISE_LABEL, OUTLET_LABEL } from '@/types/cafe';
+import { NOISE_LABEL, OUTLET_LABEL, WORK_POLICY_LABEL } from '@/types/cafe';
 import { formatBusinessHours, isOpenNow } from '@/lib/openState';
 import BookmarkButton from '@/components/bookmark/BookmarkButton';
 import ReviewSection from '@/components/review/ReviewSection';
@@ -13,6 +13,7 @@ import {
   OutletIcon,
   PriceIcon,
   WifiIcon,
+  WorkPolicyIcon,
 } from './QuickCheckIcons';
 
 interface CafeCardProps {
@@ -46,6 +47,9 @@ interface Fact {
  *
  * work_fit("작업 적합도")은 여기 넣지 않는다. 추상 평가 대신 실제 판단 신호를
  * Quick Check에 모으라는 것이 DESIGN.md의 지시이고, work_fit은 마커 테두리 색으로만 쓴다.
+ *
+ * 반면 work_policy("카공 허용")는 Quick Check에 들어간다. 이름이 비슷해도 다른 것이다 —
+ * work_fit은 우리가 매긴 환경 평가고, work_policy는 매장의 정책이라 사실에 가깝다.
  */
 export default function CafeCard({ cafe, onClose, onRequestEdit }: CafeCardProps) {
   const open = isOpenNow(cafe);
@@ -69,6 +73,19 @@ export default function CafeCard({ cafe, onClose, onRequestEdit }: CafeCardProps
       icon: <WifiIcon />,
       positive: cafe.wifi,
     },
+    // work_policy는 값이 있는 카페에만 나온다. 시드 9곳은 전부 null이라 지금은
+    // 아무 데도 뜨지 않는다 — 매장에 가 봐야 아는 값을 추측으로 채우지 않기 때문이다.
+    ...(cafe.work_policy
+      ? [
+          {
+            label: '카공 허용',
+            value: WORK_POLICY_LABEL[cafe.work_policy],
+            icon: <WorkPolicyIcon />,
+            // 색이 드는 것은 좋은 조건뿐이다. '눈치'·'금지'에는 경고색을 주지 않는다.
+            positive: cafe.work_policy === 'welcome',
+          },
+        ]
+      : []),
     {
       label: '아메리카노',
       value:

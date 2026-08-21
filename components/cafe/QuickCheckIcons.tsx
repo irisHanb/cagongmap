@@ -43,6 +43,16 @@ export function WifiIcon() {
   );
 }
 
+/** 카공 허용 — 노트북. 매장 정책을 묻는 자리라 사람이 아니라 작업 도구를 그린다. */
+export function WorkPolicyIcon() {
+  return (
+    <svg {...props}>
+      <path d="M3.5 3.5h9v7h-9z" />
+      <path d="M1.5 13h13" />
+    </svg>
+  );
+}
+
 export function PriceIcon() {
   return (
     <svg {...props}>

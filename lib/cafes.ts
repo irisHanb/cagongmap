@@ -1,6 +1,6 @@
 import { placeImageUrl } from '@/lib/place-images';
 import { supabase } from '@/lib/supabase';
-import type { Cafe, NoiseLevel, OutletLevel, WorkFit } from '@/types/cafe';
+import type { Cafe, NoiseLevel, OutletLevel, WorkFit, WorkPolicy } from '@/types/cafe';
 
 /**
  * ★ 데이터 접근 계층 (교체 지점)
@@ -17,7 +17,7 @@ import type { Cafe, NoiseLevel, OutletLevel, WorkFit } from '@/types/cafe';
 
 /**
  * places의 컬럼 중 앱이 쓰는 것만 고른다.
- * '*'를 쓰면 status·work_policy·created_by처럼 화면과 무관한 값까지 넘어온다.
+ * '*'를 쓰면 status·created_by처럼 화면과 무관한 값까지 넘어온다.
  *
  * 한 줄 리터럴로 둔다. 문자열을 이어붙이면 supabase-js가 select 결과 타입을
  * 추론하지 못하고 GenericStringError로 떨어진다.
@@ -27,7 +27,7 @@ import type { Cafe, NoiseLevel, OutletLevel, WorkFit } from '@/types/cafe';
  * 반드시 어긋난다.
  */
 export const PLACE_COLUMNS =
-  'id, slug, name, address, lat, lng, naver_place_url, open_time, close_time, is_24h, iced_americano_price, outlet, wifi, noise, work_fit, photos, tags, last_verified';
+  'id, slug, name, address, lat, lng, naver_place_url, open_time, close_time, is_24h, iced_americano_price, outlet, wifi, noise, work_fit, work_policy, photos, tags, last_verified';
 
 /**
  * published 행만 조회하므로 outlet·wifi·noise·work_fit·last_verified는 반드시 채워져
@@ -49,6 +49,8 @@ export interface PlaceRow {
   wifi: boolean;
   noise: NoiseLevel;
   work_fit: WorkFit;
+  /** 도입은 결정됐지만 값은 아직 전부 null이다 (scope.md 미확정 이슈 ②) */
+  work_policy: WorkPolicy | null;
   /** place-images 버킷의 오브젝트 경로. URL이 아니다 */
   photos: string[];
   tags: string[];
@@ -74,6 +76,7 @@ export function toCafe(row: PlaceRow): Cafe {
     wifi: row.wifi,
     noise: row.noise,
     work_fit: row.work_fit,
+    work_policy: row.work_policy,
     // DB에는 버킷 경로가, Cafe에는 바로 렌더할 수 있는 공개 URL이 담긴다.
     // 변환을 여기서 하는 덕분에 컴포넌트는 사진이 어느 버킷에서 오는지 모른다
     // — 이 이음매를 열어둔 이유가 그것이다 (lib/place-images.ts).

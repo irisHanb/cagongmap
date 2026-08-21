@@ -21,6 +21,8 @@ declare namespace kakao.maps {
     constructor(container: HTMLElement, options: MapOptions);
     setBounds(bounds: LatLngBounds): void;
     setCenter(latlng: LatLng): void;
+    /** 화면 픽셀 단위로 지도를 옮긴다. dock이 가리는 만큼 중심을 보정할 때 쓴다 */
+    panBy(dx: number, dy: number): void;
     relayout(): void;
   }
 

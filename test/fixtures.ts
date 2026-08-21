@@ -27,6 +27,8 @@ export function makeCafe(overrides: Partial<Cafe> = {}): Cafe {
     wifi: true,
     noise: 'quiet',
     work_fit: 'good',
+    // 시드 9곳이 전부 그렇듯 기본은 null이다. 값을 보는 테스트만 덮어쓴다.
+    work_policy: null,
     photos: [],
     tags: [],
     last_verified: '2026-08-15',
@@ -57,6 +59,8 @@ export function makePlaceRow(overrides: Partial<PlaceRow> = {}): PlaceRow {
     wifi: true,
     noise: 'quiet',
     work_fit: 'good',
+    // 시드 9곳이 전부 그렇듯 기본은 null이다. 값을 보는 테스트만 덮어쓴다.
+    work_policy: null,
     photos: [],
     tags: [],
     last_verified: '2026-08-15',

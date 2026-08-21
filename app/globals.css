@@ -1275,3 +1275,125 @@ a {
   line-height: 16px;
   color: var(--outline);
 }
+
+/* ---------------------------------------------------------------
+   카페 목록 페이지 (/cafes) — DESIGN.md "Cafe List Page"
+
+   지도가 아닌 유일한 화면이다. Map Shell(100dvh, overlay)이 여기에는
+   적용되지 않는다 — 평범하게 세로로 스크롤하는 문서다.
+   --------------------------------------------------------------- */
+
+.cafe-list {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--sp-xl) var(--sp-md) var(--sp-xl);
+}
+
+.cafe-list__head h1 {
+  margin-top: var(--sp-xs);
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 36px;
+}
+
+.cafe-list__sub {
+  margin-top: var(--sp-sm);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+  color: var(--on-surface-variant);
+}
+
+/* 지도로 돌아가는 길. 목록은 지도의 대체가 아니라 입구다 */
+.cafe-list__back {
+  display: inline-block;
+  margin-top: var(--sp-md);
+  padding: 8px 16px;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--r-full);
+  background: var(--surface-container-lowest);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  color: var(--on-surface-variant);
+}
+
+.cafe-list__back:hover {
+  background: var(--surface-container);
+  color: var(--on-surface);
+}
+
+.cafe-list__items {
+  margin-top: var(--sp-lg);
+  list-style: none;
+}
+
+.cafe-list__items > li + li {
+  margin-top: var(--sp-sm);
+}
+
+.cafe-entry {
+  display: flex;
+  gap: var(--sp-md);
+  padding: var(--sp-md);
+  border-radius: var(--r-lg);
+  background: var(--surface-container-lowest);
+  box-shadow: var(--shadow-brew);
+}
+
+/* 목록의 주인공은 글이다. 사진은 한 장, 작게 */
+.cafe-entry__photo {
+  flex: none;
+  width: 112px;
+  height: 112px;
+  border-radius: var(--r-md);
+  object-fit: cover;
+}
+
+.cafe-entry__name {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 28px;
+}
+
+.cafe-entry__address,
+.cafe-entry__traits,
+.cafe-entry__hours,
+.cafe-entry__tags {
+  margin-top: var(--sp-xs);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--on-surface-variant);
+}
+
+.cafe-entry__tags {
+  color: var(--outline);
+}
+
+/* 확인일은 가장 작게 두되 빼지 않는다 (mvp-decisions.md 2-3) */
+.cafe-entry__verified {
+  margin-top: var(--sp-sm);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--outline);
+}
+
+/* dock의 목록 링크. 보조 설명에 붙는 작은 텍스트 링크이지 CTA가 아니다 */
+.brand-dock__list-link {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 559px) {
+  .cafe-entry {
+    flex-direction: column;
+  }
+
+  .cafe-entry__photo {
+    width: 100%;
+    height: 160px;
+  }
+}
