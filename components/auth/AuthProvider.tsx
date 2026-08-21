@@ -29,6 +29,15 @@ interface AuthState {
   user: User | null;
   /** 세션 판정이 끝났는가. 끝나기 전에는 로그인/프로필 어느 쪽도 그리지 않는다 */
   resolved: boolean;
+  /**
+   * 이 사람이 큐레이터인가. dock에 운영 화면 입구를 보여줄지가 여기 걸려 있다.
+   *
+   * ⚠️ **이것은 표시용 판정이지 접근 제어가 아니다.** anon 키는 브라우저에 그대로
+   * 나가므로 클라이언트 판정은 언제든 조작할 수 있다. 실제 방어선은 셋이고 전부
+   * 서버에 있다 — `/admin` 레이아웃과 페이지의 `guardAdminPage()`, 서버 액션의
+   * `requireCurator()`, 그리고 RLS. 여기를 true로 바꿔 봐야 404가 나온다.
+   */
+  isCurator: boolean;
   error: string | null;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -87,6 +96,14 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   const [resolved, setResolved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loginPrompt, setLoginPrompt] = useState<LoginReason | null>(null);
+  /**
+   * 큐레이터로 확인된 사람의 uid. boolean이 아니라 **주인을 같이 든다.**
+   *
+   * boolean으로 들고 로그아웃 때 effect로 내리면, A가 나가고 B가 들어온 순간
+   * B에게 A의 권한 표시가 잠깐 비친다. 주인을 들고 렌더 중에 맞춰 보면 그 틈이
+   * 없다 — `BookmarkProvider`가 북마크 목록에 쓰는 것과 같은 방법이다.
+   */
+  const [curatorId, setCuratorId] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = getBrowserSupabase();
@@ -107,6 +124,32 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  /**
+   * 역할 조회. 세션이 정해진 뒤에 한 번 돈다.
+   *
+   * `profiles_select_all` 정책이 조회를 열어 두어 anon 키로도 읽힌다. 읽는 것은
+   * 자기 행 하나뿐이고, 결과는 "dock에 입구를 그릴까"에만 쓴다.
+   */
+  useEffect(() => {
+    if (!user) return;
+
+    let cancelled = false;
+    getBrowserSupabase()
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle<{ role: string }>()
+      .then(({ data }) => {
+        if (cancelled) return;
+        const curator = data?.role === 'curator' || data?.role === 'admin';
+        setCuratorId(curator ? user.id : null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const signIn = useCallback(async () => {
     setError(null);
@@ -137,10 +180,14 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
   const dismissLoginPrompt = useCallback(() => setLoginPrompt(null), []);
 
+  // 렌더 중에 맞춰 본다. 로그아웃하거나 다른 사람이 들어오면 그 순간 false가 된다.
+  const isCurator = user !== null && curatorId === user.id;
+
   const value = useMemo<AuthState>(
     () => ({
       user,
       resolved,
+      isCurator,
       error,
       signIn,
       signOut,
@@ -148,7 +195,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       loginPrompt,
       dismissLoginPrompt,
     }),
-    [user, resolved, error, signIn, signOut, requireLogin, loginPrompt, dismissLoginPrompt],
+    [user, resolved, isCurator, error, signIn, signOut, requireLogin, loginPrompt, dismissLoginPrompt],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

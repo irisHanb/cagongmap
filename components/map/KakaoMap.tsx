@@ -2,9 +2,8 @@
 
 import Script from 'next/script';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { KAKAO_SDK_URL } from '@/lib/kakao-sdk';
 import { MapContext } from './MapContext';
-
-const SDK_URL = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_KEY}&autoload=false`;
 
 interface KakaoMapProps {
   center: { lat: number; lng: number };
@@ -18,6 +17,10 @@ interface KakaoMapProps {
  * autoload=false로 받아 kakao.maps.load() 콜백 안에서 초기화하는 것이 핵심이다.
  * 자동 로드에 맡기면 Next.js 하이드레이션 시점과 어긋나 'kakao is not defined'가
  * 산발적으로 발생한다. (docs/implementation-plan.md 4-1)
+ *
+ * ⚠️ 스크립트 주소는 `lib/kakao-sdk.ts`에서 온다. 여기서 직접 만들지 않는다 —
+ *    `window.kakao`가 문서당 하나뿐이라 관리자 폼과 **같은 URL이어야** 한다
+ *    (그 파일의 주석 참고).
  */
 export default function KakaoMap({ center, level = 5, children }: KakaoMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -59,7 +62,7 @@ export default function KakaoMap({ center, level = 5, children }: KakaoMapProps)
 
   return (
     <>
-      <Script src={SDK_URL} strategy="afterInteractive" onReady={initMap} />
+      <Script src={KAKAO_SDK_URL} strategy="afterInteractive" onReady={initMap} />
       <div ref={containerRef} className="map-container" />
       <MapContext.Provider value={map}>{children}</MapContext.Provider>
     </>

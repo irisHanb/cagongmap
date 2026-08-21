@@ -247,3 +247,34 @@ end $$;
 
 \echo '=== 12. updated_at 트리거 ==='
 select updated_at > created_at as updated_at_moved from public.places where id = :'new_place_id';
+
+\echo '=== 13. 제보의 가게 이름은 선택이되 빈 값은 못 들어간다 ==='
+-- 2026-08-21 추가. 네이버 링크에서 상호를 뽑을 방법이 없어 제보자에게 직접 받는다.
+-- 필수가 아니라는 것과, 그렇다고 공백을 받지는 않는다는 것 둘 다 확인한다.
+insert into public.place_reports (naver_place_url, place_name)
+values ('https://naver.me/withName', '나루터');
+select place_name from public.place_reports where naver_place_url = 'https://naver.me/withName';
+
+\echo '-- 비워도 된다 (선택 입력)'
+insert into public.place_reports (naver_place_url)
+values ('https://naver.me/withoutName');
+select place_name is null as name_is_null
+  from public.place_reports where naver_place_url = 'https://naver.me/withoutName';
+
+\echo '-- 공백만 든 이름은 거부된다'
+do $$
+begin
+  insert into public.place_reports (naver_place_url, place_name)
+  values ('https://naver.me/blankName', '   ');
+  raise exception 'FAIL: 공백만 든 가게 이름이 들어갔다';
+exception when check_violation then raise notice 'OK: place_name check가 막았다';
+end $$;
+
+\echo '-- 100자를 넘기면 거부된다'
+do $$
+begin
+  insert into public.place_reports (naver_place_url, place_name)
+  values ('https://naver.me/longName', repeat('가', 101));
+  raise exception 'FAIL: 101자짜리 가게 이름이 들어갔다';
+exception when check_violation then raise notice 'OK: 길이 제한이 막았다';
+end $$;

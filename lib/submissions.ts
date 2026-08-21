@@ -1,4 +1,5 @@
 import { resolvePlaceId } from '@/lib/place-id';
+import { ALLOWED_MIME, photoFilesReason } from '@/lib/photo-rules';
 import { PLACE_IMAGE_BUCKET, placeImagePath, placeImageUrl } from '@/lib/place-images';
 import { getBrowserSupabase } from '@/lib/supabase-browser';
 
@@ -29,14 +30,15 @@ import { getBrowserSupabase } from '@/lib/supabase-browser';
 export const SUBMISSION_PREFIX = 'submissions';
 
 export const MAX_PHOTOS = 5;
-export const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 
-/** 버킷의 allowed_mime_types와 같아야 한다. 다르면 업로드가 서버에서 튕긴다. */
-export const ALLOWED_MIME: Record<string, string> = {
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
-};
+/**
+ * 파일 하나에 대한 규칙(형식·크기)은 `lib/photo-rules.ts`에 있다. 관리자 화면의
+ * 서버 액션이 같은 기준을 써야 하는데 이 파일은 세션 클라이언트를 쓰는 브라우저
+ * 전용이라 서버에서 import할 수 없어 갈랐다.
+ *
+ * 여기 남은 것은 **이 폼의 정책** — 5장 상한 — 하나뿐이다.
+ */
+export { ALLOWED_MIME, MAX_PHOTO_BYTES } from '@/lib/photo-rules';
 
 /**
  * 파일 검증. 통과하면 null, 걸리면 사유 한 줄.
@@ -49,18 +51,7 @@ export function checkPhotos(files: File[]): string | null {
   if (files.length > MAX_PHOTOS) {
     return `사진은 ${MAX_PHOTOS}장까지 올릴 수 있어요`;
   }
-
-  const wrongType = files.find((file) => !ALLOWED_MIME[file.type]);
-  if (wrongType) {
-    return 'JPG, PNG, WebP 사진만 올릴 수 있어요';
-  }
-
-  const tooBig = files.find((file) => file.size > MAX_PHOTO_BYTES);
-  if (tooBig) {
-    return '사진 한 장은 5MB까지예요';
-  }
-
-  return null;
+  return photoFilesReason(files);
 }
 
 /**
@@ -202,6 +193,17 @@ export async function submitEdit(cafeId: string, { files, note }: SubmissionInpu
 
 export interface NewPlaceInput extends SubmissionInput {
   naverUrl: string;
+  /**
+   * 가게 이름. **선택이다.**
+   *
+   * 네이버 링크에서 상호를 뽑을 방법이 없어서 직접 받는다 — naver.me는 장소 ID만
+   * 담은 주소로 리다이렉트하고 그 페이지는 이름을 클라이언트에서 렌더한다
+   * (마이그레이션 20260821082721의 주석에 확인 과정이 있다).
+   *
+   * 비워도 제보는 된다. 필수로 만들면 문턱만 올라가고, 그때는 검수하는 사람이
+   * 링크를 열어 확인하던 예전 흐름 그대로다.
+   */
+  placeName?: string;
 }
 
 /**
@@ -211,7 +213,12 @@ export interface NewPlaceInput extends SubmissionInput {
  * 그것을 강제한다. 승인 시점에 approve_place_report()가 큐레이터가 만든 카페를
  * 가리키게 채운다.
  */
-export async function submitNewPlace({ naverUrl, files, note }: NewPlaceInput): Promise<void> {
+export async function submitNewPlace({
+  naverUrl,
+  placeName,
+  files,
+  note,
+}: NewPlaceInput): Promise<void> {
   const url = naverUrl.trim();
   if (!isNaverPlaceUrl(url)) {
     throw new Error('네이버 지도 링크를 넣어주세요');
@@ -223,6 +230,8 @@ export async function submitNewPlace({ naverUrl, files, note }: NewPlaceInput): 
     .from('place_reports')
     .insert({
       naver_place_url: url,
+      // 빈 문자열을 넣지 않는다. DB의 check가 공백만 든 값을 거부한다.
+      place_name: placeName?.trim() || null,
       photos,
       note: note.trim() || null,
     });

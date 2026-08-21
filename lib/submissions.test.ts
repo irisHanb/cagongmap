@@ -11,6 +11,8 @@ import {
 /** 실제 Storage·DB를 부르지 않는다. 무엇이 오갔는지만 받아 둔다. */
 const uploaded: string[] = [];
 const removed: string[] = [];
+/** insert에 실려 나간 행. 어떤 값이 DB로 갔는지 보려고 붙잡는다 */
+const inserted: Record<string, unknown>[] = [];
 
 /** 테스트가 그때그때 갈아끼우는 실패 스위치 */
 const fail: { uploadFrom: number | null; insert: { code: string; message: string } | null } = {
@@ -39,7 +41,10 @@ vi.mock('@/lib/supabase-browser', () => ({
       }),
     },
     from: () => ({
-      insert: async () => ({ error: fail.insert }),
+      insert: async (row: Record<string, unknown>) => {
+        inserted.push(row);
+        return { error: fail.insert };
+      },
     }),
   }),
 }));
@@ -47,6 +52,7 @@ vi.mock('@/lib/supabase-browser', () => ({
 beforeEach(() => {
   uploaded.length = 0;
   removed.length = 0;
+  inserted.length = 0;
   fail.uploadFrom = null;
   fail.insert = null;
 });
@@ -204,5 +210,47 @@ describe('제출이 실패하면 올린 사진을 되돌린다', () => {
     ).rejects.toThrow('네이버 지도 링크를 넣어주세요');
 
     expect(uploaded).toEqual([]);
+  });
+});
+
+
+/**
+ * 가게 이름은 2026-08-21에 붙었다. **선택 입력이고 빈 값은 null로 간다** —
+ * DB의 check가 공백만 든 값을 거부하므로 빈 문자열을 그대로 보내면 insert가 깨진다.
+ */
+describe('submitNewPlace — 가게 이름', () => {
+  it('적은 이름을 그대로 싣는다', async () => {
+    await submitNewPlace({
+      naverUrl: 'https://naver.me/abc',
+      placeName: '나루터',
+      files: [],
+      note: '',
+    });
+    expect(inserted[0].place_name).toBe('나루터');
+  });
+
+  it('앞뒤 공백을 턴다', async () => {
+    await submitNewPlace({
+      naverUrl: 'https://naver.me/abc',
+      placeName: '  나루터 ',
+      files: [],
+      note: '',
+    });
+    expect(inserted[0].place_name).toBe('나루터');
+  });
+
+  it('공백만 넣으면 null이다', async () => {
+    await submitNewPlace({
+      naverUrl: 'https://naver.me/abc',
+      placeName: '   ',
+      files: [],
+      note: '',
+    });
+    expect(inserted[0].place_name).toBeNull();
+  });
+
+  it('아예 넘기지 않아도 된다 (선택 입력)', async () => {
+    await submitNewPlace({ naverUrl: 'https://naver.me/abc', files: [], note: '' });
+    expect(inserted[0].place_name).toBeNull();
   });
 });

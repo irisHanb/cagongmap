@@ -335,6 +335,67 @@ with gone as (
 select count(*) as own_deleted from gone;
 rollback;
 
+\echo '=== H-2. 큐레이터는 카페 사진 자리를 직접 다룬다 ==='
+-- 관리자 운영 화면이 사진을 올리고 지우려면 사람 세션에 그 권한이 있어야 한다.
+-- service_role 키를 앱에 들이는 대신 정책을 열었다(20260821060000).
+-- 위 H의 "카페 사진 자리에는 직접 못 올린다"는 여전히 통과한다 — 그쪽 uid는
+-- 큐레이터가 아니기 때문이다. 두 케이스가 함께 있어야 경계가 확인된다.
+--
+-- ⚠️ update·delete에 where 절을 쓰지 않는다. 컬럼을 참조하는 순간 SELECT 권한이
+--    함께 필요해지는데 storage.objects에는 SELECT 정책이 없어(공개 버킷이라
+--    읽기는 공개 URL로 한다) 조건에 맞는 행이 하나도 보이지 않는다. 그러면 정책이
+--    막은 것과 구분되지 않는 0 rows가 나온다. 위 H의 테스트들이 같은 이유로
+--    `returning 1`(컬럼이 아니라 상수)만 쓴다.
+--    이 테이블에 남아 있는 행은 H가 커밋한 제보 사진 하나뿐이라 조건이 필요 없다.
+
+\echo '-- 큐레이터는 <slug>/ 에 올릴 수 있다 (1 row)'
+begin;
+set local role authenticated;
+set local test.uid = '11111111-1111-1111-1111-111111111111';
+with put as (
+  insert into storage.objects (bucket_id, name)
+  values ('place-images', 'naruteo/큐레이터가올린사진.jpg')
+  returning 1
+)
+select count(*) as curator_upload from put;
+rollback;
+
+\echo '-- 큐레이터는 고칠 수 있다 (1 row)'
+begin;
+set local role authenticated;
+set local test.uid = '11111111-1111-1111-1111-111111111111';
+with changed as (
+  update storage.objects set name = 'naruteo/이름을바꿨다.jpg' returning 1
+)
+select count(*) as curator_updated from changed;
+rollback;
+
+\echo '-- 큐레이터는 지울 수 있다 (1 row)'
+begin;
+set local role authenticated;
+set local test.uid = '11111111-1111-1111-1111-111111111111';
+with gone as (
+  delete from storage.objects returning 1
+)
+select count(*) as curator_deleted from gone;
+rollback;
+
+\echo '-- 큐레이터도 다른 버킷으로는 옮기지 못한다 (with check)'
+begin;
+-- 버킷은 postgres로 만든다. storage.buckets는 RLS가 켜져 있고 정책이 없어
+-- authenticated로는 만들 수 없다.
+insert into storage.buckets (id, name, public) values ('other-bucket', 'other-bucket', false);
+set local role authenticated;
+set local test.uid = '11111111-1111-1111-1111-111111111111';
+do $$
+begin
+  update storage.objects set bucket_id = 'other-bucket';
+  raise exception 'FAIL: 큐레이터가 파일을 다른 버킷으로 옮겼다';
+exception when insufficient_privilege then
+  raise notice 'OK: place_images_curator_update의 with check가 막았다';
+end $$;
+rollback;
+
 \echo '=== I. 버킷 설정 ==='
 select id, public, file_size_limit, allowed_mime_types
   from storage.buckets

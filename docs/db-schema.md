@@ -184,6 +184,37 @@ RLS 정책과 "같은 사람이 같은 대상에 대기 중 요청 하나"(부�
 - **둘 다 `DELETE` 정책이 없다.** 보낸 사람이 지우면 검수 이력이 사라지고, 큐레이터에게는
   반려가 있다. 정책 없는 명령은 거부되므로 delete는 전부 막힌 상태다. 의도한 것이다.
 
+### `place_reports.place_name` — 제보자가 적는 가게 이름
+
+2026-08-21에 붙었다. **선택 입력이고 nullable이다.**
+
+원래 제보가 받는 것은 네이버 URL·사진·메모뿐이었고, 검수하는 사람은 어느 가게인지
+알려면 매번 링크를 열어야 했다. 표에는 도메인(`naver.me`)만 줄줄이 찍혔다.
+
+"URL에서 상호명을 자동으로 뽑는" 길은 확인해 보고 접었다.
+
+- `naver.me/XXXX` → 307 → `map.naver.com/p/entry/place/<id>`. **최종 주소에 장소 ID만
+  있고 이름이 없다.**
+- 그 페이지 응답은 2.3KB짜리 JS 셸이다. `<title>`도 `og:title`도 비어 있고 이름은
+  클라이언트에서 렌더된다.
+- 뽑으려면 헤드리스 브라우저가 필요한데 `map.naver.com/robots.txt`가 봇 접근을 막고,
+  **크롤링 금지**가 이 저장소의 구속력 있는 결정이다(`docs/mvp-decisions.md`).
+
+그래서 제보자에게 직접 받는다. 링크를 복사하는 사람은 이미 그 카페 페이지를 보고
+있으므로 아는 값이고, 긁어온 문자열보다 정확하다.
+
+```sql
+place_name text check (
+  place_name is null
+  or (btrim(place_name) <> '' and char_length(place_name) <= 100)
+)
+```
+
+- **공백만 든 값을 거부한다.** 빈 문자열이 들어오면 화면에 이름 없는 줄이 생긴다.
+- **100자 상한.** 상호명이 그보다 길 이유가 없고, 없으면 표가 무너진다.
+- ⚠️ **승인 함수가 이 값을 `places.name`으로 옮기지 않는다.** 제보자가 말한 이름이지
+  확인된 상호가 아니기 때문이다. 관리자 폼이 기본값으로 깔아 주고 큐레이터가 고친다.
+
 ### 승인 · 반려
 
 **함수가 카페를 만들지도 고치지도 않는다.** 두 테이블 어느 쪽도 `places`를 채울 만큼의
@@ -263,7 +294,7 @@ primary key (user_id, place_id)
 | `place_edit_requests` | 접근 불가 | 본인 것 insert·select, pending일 때 update | 전체 + 승인/반려 |
 | `bookmarks` | 접근 불가 | 본인 것 select·insert·delete | 예외 없음 (본인 것만) |
 | `place_reviews` | 접근 불가 (집계 함수만) | 본인 것 select·insert·update·delete | 예외 없음 (본인 것만) |
-| `storage.objects` (`place-images`) | 공개 URL로 읽기 | `submissions/<본인 uid>/`에 insert·delete | 예외 없음 (스크립트는 `service_role`) |
+| `storage.objects` (`place-images`) | 공개 URL로 읽기 | `submissions/<본인 uid>/`에 insert·delete | 버킷 전체 insert·update·delete |
 
 카페 데이터 쓰기는 큐레이터 정책 또는 `service_role`(서버 전용 키)로만 가능하다.
 `NEXT_PUBLIC_` anon 키로는 어떤 카페도 수정할 수 없다.
@@ -293,8 +324,27 @@ SQL로 못 한다** — `storage.protect_delete` 트리거가 storage 테이블 
   소유자(`postgres`)가 `bypassrls`라 정책과 무관하게 셀 수 있다.
 - `SELECT` 정책은 만들지 않았다. 공개 버킷이라 읽기는 정책이 아니라 공개 URL로
   이뤄진다 — 정책을 만들면 통제하고 있다는 인상만 준다.
-- `UPDATE` 정책도 없다(파일마다 새 uuid를 쓰므로 덮어쓸 일이 없다).
 - **모든 정책에 `bucket_id` 조건이 함께 걸려 있다** — 빼면 모든 버킷에 적용된다.
+
+**2026-08-21에 큐레이터 정책 셋(insert·update·delete)이 붙었다**
+(`20260821064124_curator_storage_policies.sql`). 관리자 운영 화면이 사진을 화면에서
+올리고 바꾸고 지우려면 사람 세션에 그 권한이 있어야 하는데, 그때까지 카페 사진 자리
+(`<slug>/`)는 `service_role`만 쓸 수 있었다. **키를 앱에 들이는 대신 정책을 열었다** —
+2026-08-21에 승인 경로에서 그 키를 걷어낸 것과 같은 방향이고, 판정은 계속 RLS가 한다.
+
+- 조건은 `bucket_id = 'place-images'`와 `public.is_curator((select auth.uid()))` 둘뿐이다.
+  경로를 보지 않는다 — **어떤 파일을 지울지는 앱의 판단**이지 권한의 경계가 아니다.
+  앱은 `places.photos`에서 뺀 경로 중 `<slug>/` 아래만 storage에서 지우고
+  `submissions/` 아래는 파일을 남긴다(제보 row가 그 URL을 여전히 가리킨다).
+- `UPDATE`에 `using`과 `with check`를 함께 걸었다. `with check`가 없으면 큐레이터가
+  파일을 다른 버킷으로 옮기는 결과를 막지 못한다.
+- 사용자용 정책은 그대로다. 큐레이터가 아닌 계정은 여전히 `<slug>/`에 쓰지 못한다.
+
+⚠️ **`storage.objects`의 `UPDATE`·`DELETE`를 테스트할 때 `where` 절에 컬럼을 쓰지
+않는다.** 컬럼을 참조하면 SELECT 권한이 함께 필요해지는데 이 테이블에는 SELECT 정책이
+없어서, 정책이 허용해도 **조건에 맞는 행이 하나도 보이지 않아 0 rows가 된다.** 정책이
+막은 것과 구분되지 않는다. `supabase/tests/20_rls_checks.sql`의 storage 케이스가
+`returning 1`(컬럼이 아니라 상수)만 쓰는 이유다.
 
 ⚠️ storage 마이그레이션에서 `alter table storage.objects enable row level security`와
 `grant`를 쓰지 않는다. RLS는 이미 켜져 있고 `authenticated` grant도 이미 있으며,

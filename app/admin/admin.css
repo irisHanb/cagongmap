@@ -1,0 +1,224 @@
+/* ---------------------------------------------------------------------------
+   관리자 화면 전용 스타일 — Tailwind v4 + shadcn/ui
+
+   ⚠️ 이 파일을 import하는 곳은 app/admin/layout.tsx 하나뿐이다.
+   app/globals.css에 넣지 말 것. Tailwind의 preflight는 margin·border·font를
+   전역에서 0으로 되돌리는 리셋이라, 공개 화면(지도 shell·dock·상세 패널)에 닿는
+   순간 레이아웃이 통째로 무너진다. Next는 CSS를 라우트 세그먼트 단위로 묶으므로
+   여기 둔 것은 /admin 밖으로 나가지 않는다.
+
+   ★ 이 파일의 목적은 **DESIGN.md의 토큰을 Tailwind 유틸리티로 여는 것**이다.
+     색·타이포·radius·간격·그림자를 눈대중으로 새로 만들지 않는다. 화면에서
+     `text-section-title` · `rounded-panel` · `shadow-brew`처럼 **이름으로** 부르면,
+     DESIGN.md가 바뀔 때 고칠 곳이 여기 하나가 된다.
+   --------------------------------------------------------------------------- */
+
+/* ═══ 스타일 순서: ① global → ② tailwind → ③ shadcn ═══════════════════════
+ *
+ * ① **global** — `app/globals.css`. 루트 레이아웃(`app/layout.tsx`)이 싣는다.
+ *    여기서 import하지 않는다. Next가 라우트 세그먼트 순서대로 묶으므로 루트가
+ *    먼저, 이 파일이 나중이다.
+ * ② **tailwind** — 아래 theme / preflight / utilities.
+ * ③ **shadcn** — 테마 변수(`:root`)와 base. 이 파일 아래쪽에 있다.
+ *
+ * ⚠️ **그런데 순서만으로는 승부가 나지 않는다.** 여기가 이 파일에서 가장 중요한
+ *    부분이다.
+ *
+ *    `app/globals.css`에 레이어 밖 리셋이 있다.
+ *
+ *        * { box-sizing: border-box; padding: 0; margin: 0; }
+ *
+ *    CSS 캐스케이드 레이어(`@layer`)는 **명시도보다 먼저** 따져지고,
+ *    **레이어에 속하지 않은 규칙이 모든 레이어를 이긴다.** 기본
+ *    `@import 'tailwindcss'`는 유틸리티를 `@layer utilities`에 넣으므로, 나중에
+ *    실려도 저 `*` 하나에게 진다. 그래서 `px-8`·`gap-4`·`space-y-6`이 전부 죽고
+ *    radius·색·글자 크기만 살아남는다 — **여백만 초기화된 것처럼 보인다.**
+ *    2026-08-21에 관리자 화면이 딱 그 모양이었다.
+ *
+ *    고칠 자리는 둘이었다. globals.css의 리셋을 레이어로 감싸거나, 여기서
+ *    유틸리티를 레이어 밖으로 꺼내거나. **후자를 택했다** — 공개 화면 CSS의
+ *    캐스케이드를 건드리지 않고 예외를 예외의 파일 안에서 끝내는 쪽이다.
+ *    레이어 밖 유틸리티(`.px-8`, 명시도 0-1-0)는 리셋(`*`, 0-0-0)을 명시도로 이긴다.
+ *
+ *    theme과 preflight는 레이어에 그대로 둔다. 그래야 공개 화면에서 온 element
+ *    규칙(`a { text-decoration: none }` 같은)이 preflight를 이겨서, 관리자 화면도
+ *    나머지 사이트와 같은 기본값 위에 선다.
+ */
+
+/* ② tailwind ─────────────────────────────────────────────────────────────── */
+@layer theme, base, components;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/preflight.css' layer(base);
+/* ⚠️ layer()를 붙이지 않는다. 위 설명 참고 — 붙이는 순간 여백이 전부 죽는다. */
+@import 'tailwindcss/utilities.css' source(none);
+@import 'tw-animate-css';
+
+/* source(none)으로 자동 스캔을 끄고 관리자 코드만 지정한다. 켜 두면 Tailwind가
+   저장소 전체를 훑어, 공개 컴포넌트의 문자열이 우연히 유틸리티 이름과 겹칠 때
+   쓰지도 않는 CSS가 /admin 번들에 실린다. */
+@source '../admin';
+@source '../../components/admin';
+@source '../../components/ui';
+
+/* ③ shadcn ───────────────────────────────────────────────────────────────── */
+
+/* ─── 색 — DESIGN.md frontmatter 그대로 ─────────────────────────────────────
+   app/globals.css의 :root와 같은 값이다. 두 파일이 같은 값을 적는 것이 마음에
+   걸리지만, 공개 화면은 Tailwind를 쓰지 않고 관리자 화면은 globals.css를 쓰지
+   않으므로 한쪽에서 다른 쪽을 참조할 방법이 없다. 원본은 언제나 DESIGN.md다. */
+:root {
+  --surface: #fffaf8;
+  --surface-dim: #e4dad6;
+  --surface-bright: #fffdfb;
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #f9f2ef;
+  --surface-container: #f3eae7;
+  --surface-container-high: #ece0dd;
+  --surface-container-highest: #e4d7d3;
+  --on-surface: #211b1a;
+  --on-surface-variant: #5b504d;
+  --outline: #92817d;
+  --outline-variant: #e2d5d1;
+  --primary: #88484a;
+  --on-primary: #ffffff;
+  --primary-container: #e8c5c2;
+  --on-primary-container: #683638;
+  --secondary: #606851;
+  --tertiary: #2f6f67;
+  --pastel-mint: #d8f1ec;
+  --positive-text: #214f49;
+  --warm-cream: #fffef9;
+
+  /* 모달 scrim. DESIGN.md — Modal 공통 규격 */
+  --scrim: rgb(33 27 26 / 0.42);
+}
+
+@theme inline {
+  /* ── DESIGN.md 이름 그대로. 화면에서는 이쪽을 부른다 ── */
+  --color-surface: var(--surface);
+  --color-surface-dim: var(--surface-dim);
+  --color-surface-bright: var(--surface-bright);
+  --color-surface-lowest: var(--surface-container-lowest);
+  --color-surface-low: var(--surface-container-low);
+  --color-surface-container: var(--surface-container);
+  --color-surface-high: var(--surface-container-high);
+  --color-surface-highest: var(--surface-container-highest);
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-variant: var(--on-surface-variant);
+  --color-outline: var(--outline);
+  --color-outline-variant: var(--outline-variant);
+  --color-primary-container: var(--primary-container);
+  --color-on-primary-container: var(--on-primary-container);
+  --color-pastel-mint: var(--pastel-mint);
+  --color-positive-text: var(--positive-text);
+  --color-warm-cream: var(--warm-cream);
+  --color-scrim: var(--scrim);
+
+  /* ── shadcn이 내부에서 쓰는 이름. 위와 같은 값을 가리킨다 ──
+     shadcn 컴포넌트가 bg-background·border-border를 하드코딩해 갖고 오므로
+     이 별칭이 있어야 한다. 새 색이 아니라 같은 색의 두 번째 이름이다. */
+  --color-background: var(--surface);
+  --color-foreground: var(--on-surface);
+  --color-card: var(--surface-container-lowest);
+  --color-card-foreground: var(--on-surface);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--on-surface);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--on-primary);
+  --color-secondary: var(--surface-container);
+  --color-secondary-foreground: var(--on-surface);
+  --color-muted: var(--surface-container-low);
+  --color-muted-foreground: var(--on-surface-variant);
+  --color-accent: var(--surface-container-high);
+  --color-accent-foreground: var(--on-surface);
+  --color-border: var(--outline-variant);
+  --color-input: var(--outline-variant);
+  --color-ring: var(--primary);
+
+  /*
+   * ⚠️ destructive에 빨강을 두지 않는다.
+   *
+   * "부정 상태에는 색을 주지 않는다. 색이 드는 것은 좋은 조건뿐이다"가 DESIGN.md의
+   * 규칙이고 관리자 화면도 예외가 아니다. 반려도 삭제도 무채색으로 눕히고, 무게는
+   * 색이 아니라 문구와 위치로 준다.
+   */
+  --color-destructive: var(--on-surface-variant);
+  --color-destructive-foreground: var(--on-primary);
+
+  /* ── 타이포 — DESIGN.md frontmatter의 typography ──
+     크기·행간·굵기가 한 이름에 묶여 있어야 `text-sm font-bold`처럼 따로 흩어지지
+     않는다. 화면에서 폰트 크기를 직접 적는 일이 없게 하는 것이 목적이다. */
+  --text-display: 28px;
+  --text-display--line-height: 36px;
+  --text-display--font-weight: 800;
+
+  --text-detail-title: 26px;
+  --text-detail-title--line-height: 32px;
+  --text-detail-title--font-weight: 800;
+
+  --text-section-title: 18px;
+  --text-section-title--line-height: 28px;
+  --text-section-title--font-weight: 800;
+
+  --text-body: 16px;
+  --text-body--line-height: 24px;
+  --text-body--font-weight: 500;
+
+  --text-label: 14px;
+  --text-label--line-height: 20px;
+  --text-label--font-weight: 700;
+
+  /* meta와 caption은 frontmatter에 이름이 없지만 본문이 허용한 범위다 —
+     "본문과 메타: 12-16px 범위에서 사용한다". label(14/700)과 굵기로 갈린다.
+     caption은 이 저장소가 반복해서 쓰는 "12px 회색 한 줄"의 이름이다. */
+  --text-meta: 14px;
+  --text-meta--line-height: 20px;
+  --text-meta--font-weight: 500;
+
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  --text-caption--font-weight: 500;
+
+  --text-eyebrow: 12px;
+  --text-eyebrow--line-height: 16px;
+  --text-eyebrow--font-weight: 700;
+  --text-eyebrow--letter-spacing: 0.12em;
+
+  /* ── radius — DESIGN.md frontmatter의 rounded ── */
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-panel: 28px;
+
+  /* ── 그림자 — DESIGN.md frontmatter의 shadows ──
+     관리자 화면이 쓰는 것은 brew 하나다. marker 계열은 지도 전용이다. */
+  --shadow-brew: 0 18px 42px -24px rgb(50 37 34 / 0.34);
+
+  /* 폰트는 루트 레이아웃이 이미 불러 둔 Pretendard를 쓴다. 관리자만 다른 글꼴을
+     쓰면 같은 서비스로 읽히지 않는다 */
+  --font-sans: 'Pretendard Variable', Pretendard, system-ui, sans-serif;
+}
+
+/*
+ * ⚠️ 간격은 Tailwind 기본 스케일(4px 단위)을 그대로 쓰되 **DESIGN.md의 다섯 칸만**
+ *    쓴다 — 1(4px) · 2(8px) · 4(16px) · 6(24px) · 8(32px).
+ *    3(12px)이나 1.5(6px)처럼 그 사이 값을 새로 만들지 않는다.
+ *    "하드코딩된 색이나 스케일 밖 여백을 새로 만들지 않는다" (CLAUDE.md)
+ *
+ * 컨트롤 높이는 h-12(48px)다. DESIGN.md의 search-bar·kakao-login·제보 폼 입력이
+ * 전부 48px이고, 한국어 UI에서 긴 단어가 버튼 안에서 눌리지 않게 하는 최소선이다.
+ */
+
+/*
+ * 다크 모드 분기를 만들지 않는다. 이 저장소의 팔레트는 라이트 하나뿐이고,
+ * prefers-color-scheme 분기를 여기서 열면 공개 화면과 갈린다 (DESIGN.md).
+ */
+@layer base {
+  * {
+    @apply border-outline-variant;
+  }
+
+  body {
+    @apply bg-surface text-on-surface;
+  }
+}

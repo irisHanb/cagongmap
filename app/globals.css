@@ -992,6 +992,20 @@ a {
   color: var(--on-surface);
 }
 
+/* 같은 규격을 <a>가 쓸 때. button과 달리 기본 정렬과 밑줄을 직접 꺼야 한다. */
+.dock-action--link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-sm);
+  text-decoration: none;
+}
+
+.dock-action--link svg {
+  width: 16px;
+  height: 16px;
+}
+
 /* 로그인 안내(320px)보다 넓다. 사진 미리보기와 메모가 들어가기 때문이며,
    그 외 규격(surface·r-panel·shadow-brew)은 로그인 모달과 같다. */
 .modal--form {
