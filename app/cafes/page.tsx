@@ -3,7 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { getCafes } from '@/lib/cafes';
 import { formatBusinessHours } from '@/lib/openState';
-import { cafeListSchema, websiteSchema } from '@/lib/schema';
+import { cafeListSchema, jsonLdText, websiteSchema } from '@/lib/schema';
 import { SITE_URL } from '@/lib/site';
 import { NOISE_LABEL, OUTLET_LABEL, WORK_POLICY_LABEL } from '@/types/cafe';
 import type { Cafe } from '@/types/cafe';
@@ -40,7 +40,7 @@ export default async function CafesPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify([websiteSchema(), cafeListSchema(cafes, url)]),
+          __html: jsonLdText([websiteSchema(), cafeListSchema(cafes, url)]),
         }}
       />
 

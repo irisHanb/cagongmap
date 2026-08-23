@@ -289,7 +289,7 @@ primary key (user_id, place_id)
 | 대상 | anon | authenticated | curator/admin |
 |---|---|---|---|
 | `places` | `published`만 select | 동일 | 전체 select·insert·update |
-| `profiles` | select | 본인 update (role 제외) | — |
+| `profiles` | **접근 불가** | 본인 것 select, 본인 update (role 제외) | 전체 select |
 | `place_reports` | 접근 불가 | 본인 것 insert·select, pending일 때 update | 전체 + 승인/반려 |
 | `place_edit_requests` | 접근 불가 | 본인 것 insert·select, pending일 때 update | 전체 + 승인/반려 |
 | `bookmarks` | 접근 불가 | 본인 것 select·insert·delete | 예외 없음 (본인 것만) |
@@ -298,6 +298,41 @@ primary key (user_id, place_id)
 
 카페 데이터 쓰기는 큐레이터 정책 또는 `service_role`(서버 전용 키)로만 가능하다.
 `NEXT_PUBLIC_` anon 키로는 어떤 카페도 수정할 수 없다.
+
+**`profiles`는 2026-08-23에 잠겼다** (`20260823034122_tighten_ugc_and_profiles.sql`).
+그전까지 `profiles_select_all`이 `to anon, authenticated using (true)`였고, anon 키는
+브라우저에 그대로 나가므로 `GET /rest/v1/profiles?select=*` 한 줄이 **전체 가입자
+명부**였다 — 카카오 표시 이름·auth uid·가입 시각, 그리고 누가 큐레이터인지까지
+(`docs/security-audit-2026-08-23/README.md` — H1). 앱이 하는 조회는 둘뿐이고 둘 다
+새 정책으로 돈다: `AuthProvider`의 본인 role, `lib/admin/reports.ts`의 제보자 닉네임.
+
+- ⚠️ **`profiles_update_own`의 `with check`가 `public.current_profile_role()`을 쓴다.**
+  원래 `select p.role from public.profiles p`로 자기 테이블을 직접 읽었는데, SELECT
+  정책이 `using (true)`인 동안에만 그 상수가 접혀 넘어갔다. 정책이 조건을 갖는 순간
+  `infinite recursion detected in policy for relation "profiles"`가 난다. `is_curator()`와
+  같은 처방(`security definer`)이고, **인자를 받지 않는다** — `profile_role(uuid)` 꼴로
+  두면 남의 role을 물어볼 수 있어 방금 막은 누출이 그대로 되살아난다.
+- **`is_curator(uuid)`도 anon에게서 회수했다** (`20260823034319`). `profiles`를 잠가도
+  이 RPC가 열려 있으면 같은 것을 로그인 없이 물어볼 수 있다.
+  ⚠️ **`revoke ... from anon`만으로는 안 된다.** 함수의 `EXECUTE`는 `PUBLIC`에 붙고
+  `anon`이 그것을 상속하므로 `from public, anon`이라야 한다. 처음에 `from anon`만
+  적어서 advisor가 그대로 남아 있었다.
+
+**제보 두 테이블의 `INSERT`는 네 가지를 더 본다** (같은 마이그레이션). 브라우저의
+`lib/submissions.ts`에만 있던 규칙이 DB에 없어서, PostgREST를 직접 부르면 전부
+빠져나갔다.
+
+| 막는 것 | 어디에 |
+|---|---|
+| 네이버가 아닌 링크 | `place_reports_naver_place_url_check` |
+| 2000자 넘는 메모 | `*_note_length` check |
+| 사진 6장 이상 | `*_photos_count` check (`MAX_PHOTOS`와 같은 값) |
+| `reviewed_by`·`reviewed_at`·`review_note`를 미리 채워 보내기 | insert 정책 `with check` |
+| 남의 검수 폴더 사진을 자기 제보에 담기 | `public.own_submission_photos()` |
+
+`own_submission_photos(text[], uuid)`는 순수 함수다(`security definer`가 아니다).
+두 테이블이 같은 규칙을 쓰므로 정책마다 정규식을 복사하지 않고 한 곳에 둔다.
+storage 정책이 "쓸 수 있는 자리"를 정한다면 이쪽은 **"가리킬 수 있는 자리"**를 정한다.
 
 **`place_reviews`는 집계만 밖으로 나간다.** 테이블 자체는 본인 행만 보이고, 화면이 쓰는
 "좋아요 3 · 보통 1 · 별로 0"은 `place_review_counts(uuid)` `security definer` 함수가 낸다

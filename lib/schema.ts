@@ -24,6 +24,27 @@ import type { Cafe } from '@/types/cafe';
 /** JSON-LD 한 덩어리. 컴포넌트는 이 타입만 보고 <script>에 넣는다 */
 export type JsonLd = Record<string, unknown>;
 
+/**
+ * `<script>` 안에 넣을 문자열. **`JSON.stringify()`를 직접 부르지 않는다.**
+ *
+ * HTML 파서는 `<script>` 안에서도 `</script`를 찾으면 거기서 블록을 닫는다. JSON
+ * 문자열에 그 일곱 글자가 들어 있으면 뒤가 통째로 마크업이 되고, 그 뒤에 무엇을
+ * 적을지는 값을 넣은 사람이 정한다.
+ *
+ * 지금 이 함수를 지나는 값(카페 이름·주소)은 큐레이터가 폼으로 넣은 것이라 당장
+ * 뚫리지는 않는다. 그래도 두는 이유는 **한 칸 건너면 사용자 입력이기 때문이다** —
+ * `place_reports.place_name`은 제보자가 직접 적고, `app/admin/places/new/page.tsx`가
+ * 그 값을 `places.name` 칸에 그대로 깔아 준다. DB 제약은 공백과 100자만 보므로
+ * `</script>`가 들어갈 자리가 남는다. 남은 방어선이 "큐레이터가 저장 전에 이름을
+ * 눈으로 본다" 하나가 되는데, 그것은 코드의 성질이 아니다.
+ *
+ * `<`를 통째로 바꾼다 — `</script`만 노리면 `<!--`가 남는다. `\u003c`는 JSON에서
+ * `<`와 같은 값이라 파서가 읽는 결과는 바뀌지 않는다.
+ */
+export function jsonLdText(schema: JsonLd | JsonLd[]): string {
+  return JSON.stringify(schema).replace(/</g, '\\u003c');
+}
+
 export function websiteSchema(): JsonLd {
   return {
     '@context': 'https://schema.org',

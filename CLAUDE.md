@@ -63,6 +63,11 @@ npm run test:run   # vitest 1회 실행
 - 세션이 필요한 컴포넌트는 **`@/lib/supabase-browser` 하나만 `vi.mock`한다.**
   AuthProvider·BookmarkProvider는 실제 코드가 돌게 둔다 (`components/cafe/CafeCard.test.tsx` 참고).
 - 실제 Supabase에 붙는 테스트는 없다. DB 쪽 검증은 `./scripts/verify-schema.sh`가 따로 한다.
+- ⚠️ **`supabase/tests/`에 `select count(*)`를 출력만 하고 두지 않는다.** psql은 값이
+  무엇이 나오든 exit 0이라 그런 검사는 RLS를 통째로 지워도 통과한다. 2026-08-23까지
+  `20_rls_checks.sql`의 절반이 그 상태였다. **`pg_temp.assert_eq()`로 기대값을 적는다.**
+- **막는 것만 적지 않는다.** 거부를 확인하는 케이스 옆에 "규칙을 지킨 입력은 그대로
+  들어간다"를 함께 둔다. 없으면 전부 거부하는 정책을 넣어도 그 절이 통과한다.
 - **버그를 잡는 테스트는 수정을 되돌려 실패하는지 확인하고 넣는다.** 통과만 보고 넣으면
   무른 테스트가 남는다.
 - **가짜 서버 목은 응답을 호출 시점 스냅샷으로 만든다.** 지연 뒤에 현재 상태를 읽어
@@ -231,6 +236,11 @@ Supabase 클라이언트가 셋이다. **역할이 달라서 나눈 것이지 �
   경로이고, URL이나 공백이 들어오면 check 제약이 막는다.
 - **`lib/reviews.ts`·`lib/submissions.ts`가 이음매다.** `lib/cafes.ts`와 같은 규칙이고,
   세션이 필요하므로 둘 다 브라우저 전용이다.
+- ⚠️ **`lib/submissions.ts`의 검사는 안내이지 방어선이 아니다.** anon 키가 브라우저에
+  나가므로 그 파일을 건너뛰고 PostgREST를 직접 부를 수 있다. 2026-08-23에 같은 규칙을
+  DB로 내렸다 — 네이버 도메인·메모 2000자·사진 5장은 check 제약이, 검수 컬럼 위조와
+  "남의 검수 폴더 사진 담기"는 insert 정책의 with check(`own_submission_photos()`)가
+  막는다. **한쪽만 고치지 않는다** (`docs/security-audit-2026-08-23/README.md`).
 - **slug → uuid 변환은 `lib/place-id.ts` 하나뿐이다.** 북마크·리뷰·제보가 같이 쓴다.
 - **리뷰 집계는 `place_review_counts()` RPC로만 읽는다.** `place_reviews`를 직접 select하면
   누가 어디에 `bad`를 눌렀는지가 통째로 나온다. 테이블 select는 본인 행만 열려 있다.
@@ -577,8 +587,18 @@ alter table public.<table> enable row level security;
 - **`auth.uid()`는 `(select auth.uid())`로 감싼다.** 감싸야 플래너가 행마다가 아니라
   구문당 한 번 평가한다. 기존 정책이 전부 이 형태이므로 새 정책도 맞춘다.
 - **정책 안에서 같은 테이블을 select하면 RLS가 재귀한다.** `profiles.role`을 보는 판정은
-  `security definer` 함수(`public.is_curator()`)로 빼두었다. 역할 기반 정책을 새로 쓸 때
-  이 함수를 쓴다.
+  `security definer` 함수(`public.is_curator()`·`public.current_profile_role()`)로 빼두었다.
+  역할 기반 정책을 새로 쓸 때 이 함수를 쓴다.
+  - ⚠️ **`using (true)`인 동안에는 이 함정이 드러나지 않는다.** 상수 qual이 접혀서
+    넘어가기 때문이다. 2026-08-23에 `profiles`의 SELECT 정책을 좁히자 그때까지 멀쩡하던
+    `profiles_update_own`이 `infinite recursion detected`로 죽었다 — with check가
+    `select p.role from public.profiles p`를 하고 있었다. **정책을 좁힐 때는 그 테이블의
+    다른 정책이 자기 테이블을 읽고 있지 않은지 함께 본다.**
+- ⚠️ **함수 execute를 회수할 때 `from anon`만 적지 않는다.** `EXECUTE`는 함수가 만들어질
+  때 `PUBLIC`에 붙고 `anon`은 그것을 상속하므로, `revoke ... from anon`은 아무 일도
+  하지 않는다. **`from public, anon`이라야 하고**, 로그인 사용자에게 필요하면
+  `grant execute ... to authenticated`를 뒤에 붙인다. 저장소의 다른 revoke가 전부 그
+  형태다. (2026-08-23에 `is_curator`가 이걸로 한 번 새어 있었다)
 
 ### 새 테이블을 만들 때
 
@@ -644,6 +664,7 @@ mv supabase/migrations/<임시>.sql supabase/migrations/<버전>_<이름>.sql
 | `implementation-plan.md` | 폴더 구조와 1차 구현 단계 |
 | `research-verification.md` | 위 결정들의 조사 근거 |
 | `seo-audit-2026-08-21/` | SEO 종합 감사 스냅샷. 특정 시점 기록이라 갱신하지 않는다 — 다시 감사하면 새 폴더를 만든다 |
+| `security-audit-2026-08-23/` | 런칭 전 보안 감사 스냅샷. 같은 규칙이다. **6절 「사람이 결정할 것」이 아직 열려 있다** |
 
 ### 구속력 있는 결정 (뒤집으려면 문서부터 갱신할 것)
 

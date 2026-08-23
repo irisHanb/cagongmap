@@ -1,6 +1,6 @@
 import MapView from '@/components/map/MapView';
 import { getCafes } from '@/lib/cafes';
-import { websiteSchema } from '@/lib/schema';
+import { jsonLdText, websiteSchema } from '@/lib/schema';
 
 /**
  * 큐레이션 데이터라 분 단위로 바뀌지 않는다. 5분마다 다시 만든다.
@@ -16,7 +16,7 @@ export default async function Home() {
           지도 위 마커라, ItemList는 실제로 목록이 있는 /cafes에 있다. */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema()) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdText(websiteSchema()) }}
       />
       <MapView cafes={cafes} />
     </>

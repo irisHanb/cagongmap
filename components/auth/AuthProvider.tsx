@@ -128,8 +128,13 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   /**
    * 역할 조회. 세션이 정해진 뒤에 한 번 돈다.
    *
-   * `profiles_select_all` 정책이 조회를 열어 두어 anon 키로도 읽힌다. 읽는 것은
-   * 자기 행 하나뿐이고, 결과는 "dock에 입구를 그릴까"에만 쓴다.
+   * `profiles_select_own_or_curator` 정책이 **본인 행만** 열어 준다. 결과는
+   * "dock에 입구를 그릴까"에만 쓴다.
+   *
+   * ⚠️ `if (!user) return;`이 이 정책의 전제다. 2026-08-23 전까지 정책이
+   *    `to anon using (true)`였고, 그때는 로그아웃 상태로도 남의 행이 읽혔다
+   *    (docs/security-audit-2026-08-23/README.md — H1). 로그아웃 상태에서 이
+   *    조회를 돌리려 하면 지금은 빈 결과가 온다.
    */
   useEffect(() => {
     if (!user) return;
