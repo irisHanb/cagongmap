@@ -1,0 +1,126 @@
+name: PR Review
+
+# 커밋마다 돌지 않는다. PR이 열릴 때 한 번만이다 — synchronize를 넣으면 push 한 번에
+# 리뷰가 한 벌씩 쌓이고, 같은 지적이 라인마다 중복된다.
+on:
+  pull_request:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  # 코드 리뷰 — 정확성·재사용·단순화. 내장 code-review skill이 기준이다.
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # base..head diff를 봐야 하므로 얕게 받지 않는다
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+            BASE: ${{ github.event.pull_request.base.sha }}
+            HEAD: ${{ github.event.pull_request.head.sha }}
+
+            이 PR의 변경분을 리뷰한다. `Skill` 도구로 `code-review` skill을 `high`로 부르고
+            그 skill이 정한 방식대로 본다. 저장소 규칙은 CLAUDE.md와 docs/code-guide.md에 있다.
+
+            - `--comment`나 `--fix` 인자를 붙이지 않는다. 코멘트는 아래 규칙대로 직접 남긴다.
+            - 리뷰 대상은 이 PR이 바꾼 줄이다. 주변 파일은 맥락을 이해하려고 읽는다.
+            - `ReportFindings` 도구는 이 환경에 없다. 결과를 코멘트로 낸다.
+
+            ## 결과를 남기는 방법
+
+            발견마다 `mcp__github_inline_comment__create_inline_comment`로 **해당 파일의 해당
+            줄에** 인라인 코멘트를 단다. 첫 줄이 시급도이고, 그다음이 무엇이 왜 문제인지,
+            마지막이 어떻게 고치는지다.
+
+            ```
+            **🔴 P0 시급** — 한 줄 요약
+
+            무엇이 어떤 입력에서 어떻게 실패하는지.
+
+            고치는 방법 한 줄. (코드가 짧으면 suggestion 블록으로)
+            ```
+
+            시급도는 넷뿐이다.
+
+            | 라벨 | 뜻 |
+            |---|---|
+            | `🔴 P0 시급` | 머지하면 안 된다 — 데이터 유실·보안 노출·확실한 런타임 오류 |
+            | `🟠 P1 높음` | 머지 전에 고친다 — 특정 입력에서 틀린 결과가 나온다 |
+            | `🟡 P2 보통` | 고치면 좋다 — 중복·불필요한 복잡도·놓친 테스트 |
+            | `⚪ P3 참고` | 제안. 안 고쳐도 된다 |
+
+            마지막에 `gh pr comment`로 요약 하나를 남긴다 — 시급도별 개수와, 라인에 달 수 없는
+            지적(파일이 통째로 빠졌다 같은 것)만. 인라인으로 이미 단 내용을 다시 적지 않는다.
+
+            **없으면 없다고 쓴다.** 채우려고 짜내지 않는다.
+          claude_args: |
+            --allowedTools "Skill,mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
+
+  # 보안 점검 — 저장소의 .claude/skills/security-check를 그대로 쓴다.
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+            BASE: ${{ github.event.pull_request.base.sha }}
+            HEAD: ${{ github.event.pull_request.head.sha }}
+
+            이 PR의 변경분을 보안 관점으로 점검한다. `Skill` 도구로 이 저장소의
+            `security-check` skill(`.claude/skills/security-check/SKILL.md`)을 불러 그 문서가
+            정한 관점과 결과 형식을 따른다.
+
+            CI라 skill의 1절을 그대로 따를 수 없다. 두 가지를 고정한다.
+
+            - **`AskUserQuestion`을 쓰지 않는다.** 물어볼 사람이 없다.
+            - **점검 방식은 3번(로컬 코드만)이다.** HTTP 요청을 한 건도 보내지 않는다.
+              운영·Preview·로컬 서버 어디에도 접속하지 않는다.
+
+            범위는 이 PR이 바꾼 줄이다. skill의 2절 표에 있는 자리는 그 변경이 무엇을
+            건드렸는지 판단하려고 읽는다. **PR과 무관한 기존 문제를 새로 올리지 않는다** —
+            이미 `docs/security-audit-2026-08-23/README.md`에 있는 것도 마찬가지다.
+
+            ## 결과를 남기는 방법
+
+            skill 4절의 세 묶음 중 **「바로 고칠 것」은 인라인 코멘트로** 낸다 —
+            `mcp__github_inline_comment__create_inline_comment`로 해당 파일의 해당 줄에.
+
+            ```
+            **🔴 P0 시급** · `[사용자]` — 한 줄 요약
+
+            무엇이 어떻게 뚫리는지. 근거는 파일:줄로.
+
+            고치는 방법 한 줄.
+            ```
+
+            시급도 넷과 관점 태그(`[사용자]` / `[서비스]`)를 함께 붙인다.
+
+            | 라벨 | 뜻 |
+            |---|---|
+            | `🔴 P0 시급` | 자격증명 노출, 인증·인가 우회, 남의 데이터에 닿는 경로 |
+            | `🟠 P1 높음` | 방어선이 한 겹뿐 — 앱 코드만 막고 DB(RLS·check)가 안 막는다 |
+            | `🟡 P2 보통` | 정보 노출, 상한 없음, 오류 메시지에 내부 구조 |
+            | `⚪ P3 참고` | 강화 제안 |
+
+            「사람이 결정할 것」과 「반복 점검할 것」은 라인에 달 수 없다.
+            `gh pr comment`로 요약 하나에 그 두 묶음을 담는다. 빈 묶음은 비었다고 적는다.
+
+            **발견이 없으면 없다고 쓴다.** 이 skill 4절 마지막 줄 그대로다.
+          claude_args: |
+            --allowedTools "Skill,mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(grep:*),Bash(rg:*)"
