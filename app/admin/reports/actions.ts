@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { rejectSubmission } from '@/lib/admin/reports';
 import type { SubmissionKind } from '@/lib/admin/submission';
+import { log, reasonOf, requestId } from '@/lib/log';
 
 /**
  * 반려.
@@ -19,11 +20,33 @@ export async function rejectSubmissionAction(
   id: string,
   reason: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
+  const rid = requestId();
+  const started = Date.now();
+
   try {
     await rejectSubmission(kind, id, reason);
   } catch (error) {
+    log('error', 'admin.submission.reject', {
+      request_id: rid,
+      kind,
+      submission_id: id,
+      outcome: 'error',
+      reason: reasonOf(error),
+      duration_ms: Date.now() - started,
+    });
     return { ok: false, message: error instanceof Error ? error.message : '반려하지 못했습니다' };
   }
+
+  // 반려 사유는 제보자가 적은 글이 아니라 큐레이터가 적은 글이지만, 로그의 목적은
+  // "무엇이 반려됐나"이지 "뭐라고 적었나"가 아니라 길이만 남긴다.
+  log('info', 'admin.submission.reject', {
+    request_id: rid,
+    kind,
+    submission_id: id,
+    outcome: 'ok',
+    has_reason: reason.trim().length > 0,
+    duration_ms: Date.now() - started,
+  });
 
   revalidatePath('/admin/reports');
   return { ok: true };

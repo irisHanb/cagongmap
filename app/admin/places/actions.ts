@@ -15,6 +15,7 @@ import {
   updatePlace,
   uploadPlacePhotos,
 } from '@/lib/admin/places';
+import { log, reasonOf, requestId } from '@/lib/log';
 import { createServerSupabase } from '@/lib/supabase-server';
 
 /**
@@ -65,16 +66,45 @@ export type SavePlaceResult =
  * 붙여 같은 사진이 두 장이 된다.
  */
 export async function savePlaceAction(input: SavePlaceInput): Promise<SavePlaceResult> {
+  const rid = requestId();
+  const started = Date.now();
+  const mode = input.id ? 'update' : 'create';
+
   // ⚠️ 서버 액션은 app/admin/layout.tsx의 가드 뒤에 있지 않다. 별도 POST
   //    엔드포인트로 직접 호출할 수 있으므로 여기서 다시 판정한다.
+  let curator;
   try {
-    await requireCurator();
+    curator = await requireCurator();
   } catch {
+    // 거부 로그는 requireCurator()가 이미 남겼다. 여기서 또 남기지 않는다
     return { ok: false, errors: ['관리자만 할 수 있는 작업입니다'] };
   }
 
+  // 흐름의 시작. 운영에서는 걸러지고 문제를 볼 때만 LOG_LEVEL=debug로 연다
+  log('debug', 'admin.place.save.start', {
+    request_id: rid,
+    user_id: curator.id,
+    mode,
+    place_id: input.id,
+    new_photos: input.files.length,
+    report_id: input.reportId,
+    request_ref: input.requestId,
+  });
+
   const errors = validatePlaceForm(input.values);
-  if (errors.length > 0) return { ok: false, errors };
+  if (errors.length > 0) {
+    log('info', 'admin.place.save', {
+      request_id: rid,
+      user_id: curator.id,
+      mode,
+      outcome: 'error',
+      // 실패한 항목 이름만 남긴다. 사용자가 적은 값은 로그에 넣지 않는다
+      reason: 'invalid_form',
+      invalid: errors.length,
+      duration_ms: Date.now() - started,
+    });
+    return { ok: false, errors };
+  }
 
   const payload = buildPlacePayload(input.values);
 
@@ -97,7 +127,7 @@ export async function savePlaceAction(input: SavePlaceInput): Promise<SavePlaceR
     await removePlacePhotos(deletablePaths(input.originalPhotos, photos));
 
     // 5. 승인. 실패해도 되돌리지 않는다 — 장소는 이미 저장됐고 그것은 유효한 결과다
-    const warning = await approveIfAsked(input, place.id);
+    const warning = await approveIfAsked(input, place.id, rid, curator.id);
 
     revalidatePath('/admin/places');
     revalidatePath('/admin/reports');
@@ -106,8 +136,30 @@ export async function savePlaceAction(input: SavePlaceInput): Promise<SavePlaceR
     revalidatePath('/');
     revalidatePath('/cafes');
 
+    log('info', 'admin.place.save', {
+      request_id: rid,
+      user_id: curator.id,
+      mode,
+      place_id: place.id,
+      outcome: 'ok',
+      photos: photos.length,
+      uploaded: uploaded.length,
+      // 저장은 됐는데 승인이 실패한 경우를 결과 한 줄에서 구분할 수 있게 둔다
+      approve_failed: warning ? true : undefined,
+      duration_ms: Date.now() - started,
+    });
+
     return warning ? { ok: true, id: place.id, warning } : { ok: true, id: place.id };
   } catch (error) {
+    log('error', 'admin.place.save', {
+      request_id: rid,
+      user_id: curator.id,
+      mode,
+      place_id: input.id,
+      outcome: 'error',
+      reason: reasonOf(error),
+      duration_ms: Date.now() - started,
+    });
     return { ok: false, errors: [error instanceof Error ? error.message : '저장하지 못했습니다'] };
   }
 }
@@ -122,9 +174,15 @@ export async function savePlaceAction(input: SavePlaceInput): Promise<SavePlaceR
  * 세 번째 인자(승인자)를 넘기지 않는다. 세션이 있으므로 `resolve_reviewer()`가
  * `auth.uid()`를 먼저 보고 인자는 무시된다.
  */
-async function approveIfAsked(input: SavePlaceInput, placeId: string): Promise<string | undefined> {
+async function approveIfAsked(
+  input: SavePlaceInput,
+  placeId: string,
+  rid: string,
+  curatorId: string,
+): Promise<string | undefined> {
   if (!input.reportId && !input.requestId) return undefined;
 
+  const started = Date.now();
   const supabase = await createServerSupabase();
 
   const { error } = input.reportId
@@ -133,6 +191,19 @@ async function approveIfAsked(input: SavePlaceInput, placeId: string): Promise<s
         p_place_id: placeId,
       })
     : await supabase.rpc('approve_edit_request', { p_request_id: input.requestId });
+
+  // 승인은 제보자에게 보이는 상태를 바꾸는 일이라 성공도 남긴다.
+  log(error ? 'error' : 'info', 'admin.submission.approve', {
+    request_id: rid,
+    user_id: curatorId,
+    kind: input.reportId ? 'report' : 'edit',
+    submission_id: input.reportId ?? input.requestId,
+    place_id: placeId,
+    outcome: error ? 'error' : 'ok',
+    reason: error?.message,
+    code: error?.code,
+    duration_ms: Date.now() - started,
+  });
 
   if (error) {
     return `장소는 저장했지만 제보 승인에 실패했어요: ${error.message}`;

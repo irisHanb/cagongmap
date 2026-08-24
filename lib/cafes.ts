@@ -1,3 +1,4 @@
+import { log, requestId } from '@/lib/log';
 import { placeImageUrl } from '@/lib/place-images';
 import { supabase } from '@/lib/supabase';
 import type { Cafe, NoiseLevel, OutletLevel, WorkFit, WorkPolicy } from '@/types/cafe';
@@ -86,7 +87,17 @@ export function toCafe(row: PlaceRow): Cafe {
   };
 }
 
+/**
+ * ⚠️ 이 파일의 로그는 **서버에서만 수집기에 간다.**
+ *
+ * `getCafes`·`getCafeById`는 서버 컴포넌트가 부르지만 `getCafeByNaverUrl`은 제보
+ * 모달(클라이언트)이 부른다 — 그쪽 로그는 사용자 콘솔에 찍힐 뿐이다. 같은 파일에
+ * 두 환경이 섞여 있는 것은 이 이음매의 성질이고, 로그 형식을 갈라 놓으면 그 사실이
+ * 오히려 흐려져서 하나로 둔다.
+ */
+
 export async function getCafes(): Promise<Cafe[]> {
+  const started = Date.now();
   const { data, error } = await supabase
     .from('places')
     .select(PLACE_COLUMNS)
@@ -97,13 +108,28 @@ export async function getCafes(): Promise<Cafe[]> {
     .returns<PlaceRow[]>();
 
   if (error) {
+    log('error', 'db.places.list', {
+      request_id: requestId(),
+      outcome: 'error',
+      reason: error.message,
+      code: error.code,
+      duration_ms: Date.now() - started,
+    });
     throw new Error(`카페 목록을 불러오지 못했습니다: ${error.message}`);
   }
+
+  log('debug', 'db.places.list', {
+    request_id: requestId(),
+    outcome: 'ok',
+    count: data.length,
+    duration_ms: Date.now() - started,
+  });
 
   return data.map(toCafe);
 }
 
 export async function getCafeById(id: string): Promise<Cafe | undefined> {
+  const started = Date.now();
   const { data, error } = await supabase
     .from('places')
     .select(PLACE_COLUMNS)
@@ -113,6 +139,14 @@ export async function getCafeById(id: string): Promise<Cafe | undefined> {
     .maybeSingle();
 
   if (error) {
+    log('error', 'db.places.get', {
+      request_id: requestId(),
+      slug: id,
+      outcome: 'error',
+      reason: error.message,
+      code: error.code,
+      duration_ms: Date.now() - started,
+    });
     throw new Error(`카페를 불러오지 못했습니다 (${id}): ${error.message}`);
   }
 
@@ -130,6 +164,7 @@ export async function getCafeById(id: string): Promise<Cafe | undefined> {
  * 잡으려면 anon에게 draft를 열어야 하는데, 그것이 더 큰 대가다.
  */
 export async function getCafeByNaverUrl(url: string): Promise<Cafe | undefined> {
+  const started = Date.now();
   const { data, error } = await supabase
     .from('places')
     .select(PLACE_COLUMNS)
@@ -139,6 +174,13 @@ export async function getCafeByNaverUrl(url: string): Promise<Cafe | undefined> 
     .maybeSingle();
 
   if (error) {
+    log('error', 'db.places.find_by_naver_url', {
+      request_id: requestId(),
+      outcome: 'error',
+      reason: error.message,
+      code: error.code,
+      duration_ms: Date.now() - started,
+    });
     throw new Error(`카페를 확인하지 못했습니다: ${error.message}`);
   }
 

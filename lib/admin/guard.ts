@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
+import { log, requestId } from '@/lib/log';
 import { createServerSupabase } from '@/lib/supabase-server';
 
 /**
@@ -66,6 +67,9 @@ export const getCurator = cache(async (): Promise<Curator | null> => {
 export async function requireCurator(): Promise<Curator> {
   const curator = await getCurator();
   if (!curator) {
+    // 거부는 관측 대상이다. 액션마다 남기지 않고 판정이 모이는 여기 한 곳에 둔다
+    // — 액션이 늘어도 빠뜨릴 자리가 생기지 않는다.
+    log('warn', 'admin.access', { request_id: requestId(), outcome: 'denied', at: 'action' });
     throw new Error('관리자만 할 수 있는 작업입니다');
   }
   return curator;
@@ -86,6 +90,9 @@ export async function requireCurator(): Promise<Curator> {
  */
 export async function guardAdminPage(): Promise<Curator> {
   const curator = await getCurator();
-  if (!curator) notFound();
+  if (!curator) {
+    log('warn', 'admin.access', { request_id: requestId(), outcome: 'denied', at: 'page' });
+    notFound();
+  }
   return curator;
 }

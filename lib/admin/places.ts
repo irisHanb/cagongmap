@@ -5,6 +5,7 @@ import {
   type PlacePayload,
   type PlaceStatus,
 } from '@/lib/admin/place-form';
+import { log, reasonOf, requestId } from '@/lib/log';
 import { extensionFor, photoFilesReason } from '@/lib/photo-rules';
 import { PLACE_IMAGE_BUCKET, placeImageUrl } from '@/lib/place-images';
 import { createServerSupabase } from '@/lib/supabase-server';
@@ -245,6 +246,7 @@ export async function uploadPlacePhotos(
 
   const supabase = await createServerSupabase();
   const storage = supabase.storage.from(PLACE_IMAGE_BUCKET);
+  const started = Date.now();
 
   const uploaded: string[] = [];
   for (const file of files) {
@@ -254,10 +256,30 @@ export async function uploadPlacePhotos(
     if (error) {
       // 세 번째 장에서 실패하면 앞의 둘이 버킷에 남는다. 되돌리고 던진다.
       await removePlacePhotos(uploaded);
+      log('error', 'storage.upload', {
+        request_id: requestId(),
+        bucket: PLACE_IMAGE_BUCKET,
+        folder,
+        // 몇 장째에서 끊겼는지가 되돌리기가 제대로 돌았는지 보는 값이다
+        uploaded: uploaded.length,
+        total: files.length,
+        outcome: 'error',
+        reason: error.message,
+        duration_ms: Date.now() - started,
+      });
       throw new Error(`사진을 올리지 못했습니다: ${error.message}`);
     }
     uploaded.push(path);
   }
+
+  log('debug', 'storage.upload', {
+    request_id: requestId(),
+    bucket: PLACE_IMAGE_BUCKET,
+    folder,
+    uploaded: uploaded.length,
+    outcome: 'ok',
+    duration_ms: Date.now() - started,
+  });
 
   return uploaded;
 }
@@ -278,9 +300,15 @@ export async function removePlacePhotos(paths: string[]): Promise<void> {
   const supabase = await createServerSupabase();
   const { error } = await supabase.storage.from(PLACE_IMAGE_BUCKET).remove(paths);
 
-  if (error) {
-    console.warn('사진 파일을 지우지 못했습니다:', error.message);
-  }
+  // 삭제는 되돌릴 수 없는 변경이라 성공도 남긴다. 실패는 던지지 않으므로
+  // (위 주석 참고) 로그가 남지 않으면 파일이 새는 것을 알 방법이 없다.
+  log(error ? 'warn' : 'info', 'storage.remove', {
+    request_id: requestId(),
+    bucket: PLACE_IMAGE_BUCKET,
+    count: paths.length,
+    outcome: error ? 'error' : 'ok',
+    reason: error ? reasonOf(error) : undefined,
+  });
 }
 
 /**
