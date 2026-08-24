@@ -16,6 +16,8 @@ const eslintConfig = defineConfig([
     "coverage/**",
     ".playwright/**",
     ".playwright-cli/**",
+    // 로컬 worktree. 그 안의 .next는 위 ".next/**"가 최상위만 잡아서 걸리지 않는다.
+    ".worktrees/**",
   ]),
 ]);
 
