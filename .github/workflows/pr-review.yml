@@ -9,7 +9,6 @@ on:
 permissions:
   contents: read
   pull-requests: write
-  id-token: write   # 액션이 OIDC로 GitHub App 토큰을 받는다. 없으면 시작도 못 한다
 
 jobs:
   # 코드 리뷰 — 정확성·재사용·단순화. 내장 code-review skill이 기준이다.
@@ -23,6 +22,9 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Claude GitHub App(github.com/apps/claude)을 설치하지 않았다. 이 값을 주면
+          # 액션이 App 토큰 교환을 건너뛰고 이 토큰으로 코멘트를 단다.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
@@ -77,6 +79,9 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Claude GitHub App(github.com/apps/claude)을 설치하지 않았다. 이 값을 주면
+          # 액션이 App 토큰 교환을 건너뛰고 이 토큰으로 코멘트를 단다.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
