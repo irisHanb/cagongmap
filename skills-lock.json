@@ -31,6 +31,12 @@
       "skillPath": "skills/prd/SKILL.md",
       "computedHash": "f903f891eaf32bc70c80b1405b05f27bee1c9f34e1b695f11d9d359fcedf1ad8"
     },
+    "skill-creator": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/skill-creator/SKILL.md",
+      "computedHash": "5ea13a6d9f0d4bb694405d79acd00cadec0d21bb138c4dd10fcf3c500cb835c2"
+    },
     "verify": {
       "source": "yansfil/vibe-engineering",
       "sourceType": "github",
