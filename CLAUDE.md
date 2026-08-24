@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 > `AGENTS.md`는 `next dev`가 실행될 때마다 자동으로 다시 쓰인다. 직접 편집하지 말 것.
 
+개발 작업을 시작하기 전에 `docs/code-guide.md`를 먼저 읽는다.
+
 ## 프로젝트
 
 카공맵 — 노트북 작업하기 좋은 카페를 카카오맵 위에서 찾는 서비스. **개인 습작 MVP**(인프런 VC 클래스)이며, 사업화가 아니라 학습이 목적이다.
