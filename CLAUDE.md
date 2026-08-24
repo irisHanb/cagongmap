@@ -52,6 +52,32 @@ npm run test:run   # vitest 1회 실행
   방금 통과한 것과 실제로 커밋되는 내용이 다르다. 훅이 그럴 때 한 줄로 알려 준다.
 - 일부러 건너뛰려면 `git commit --no-verify`.
 
+### GitHub Actions
+
+워크플로우가 둘이다. **역할이 다르고 도는 시점도 다르다.**
+
+| 파일 | 언제 | 무엇 |
+|---|---|---|
+| `.github/workflows/ci.yml` | main push · 모든 PR (커밋마다) | `lint` · `typecheck` · `test:run` · `build` |
+| `.github/workflows/pr-review.yml` | **PR이 열릴 때만** (`opened`·`reopened`) | 코드 리뷰 · 보안 점검 |
+
+- **PR Review는 `synchronize`를 넣지 않는다.** 넣으면 push 한 번에 리뷰가 한 벌씩
+  쌓이고 같은 지적이 같은 줄에 중복된다.
+- job이 둘이다. `review`는 내장 `code-review` skill을, `security`는 이 저장소의
+  `.claude/skills/security-check`를 부른다. 발견은 해당 라인에 시급도
+  (`🔴 P0 시급` · `🟠 P1 높음` · `🟡 P2 보통` · `⚪ P3 참고`)를 붙여 인라인 코멘트로 남기고,
+  라인에 달 수 없는 것만 요약 코멘트 하나로 낸다.
+- ⚠️ **`security-check` skill 1절은 `AskUserQuestion`으로 점검 방식을 묻는다.** CI에는
+  답할 사람이 없으므로 프롬프트가 **3번(로컬 코드만)으로 고정하고 HTTP 요청을 금지한다.**
+  skill을 고칠 때 이 절을 함께 본다.
+- ⚠️ **skill의 보고 형식이 프롬프트를 이긴다.** `code-review` skill이 자체 형식을 갖고
+  있어 처음에는 시급도 없이 영어로 달렸다. 그래서 프롬프트가 **skill에서 가져오는 것을
+  "무엇을 볼지"로 한정하고 형식·언어·도구는 프롬프트가 우선한다**고 못 박는다.
+- **인증은 `CLAUDE_CODE_OAUTH_TOKEN` 시크릿이다.** 여기에 더해 `github_token`으로
+  `secrets.GITHUB_TOKEN`을 넘긴다 — Claude GitHub App(`github.com/apps/claude`)이 이
+  저장소에 설치돼 있지 않아서다. App을 설치하면 그 줄을 지우고 코멘트 주인이
+  `github-actions[bot]`에서 `claude[bot]`으로 바뀐다.
+
 ### 테스트 (Vitest)
 
 - 테스트 파일은 대상 옆에 둔다 — `lib/openState.ts` ↔ `lib/openState.test.ts`.
