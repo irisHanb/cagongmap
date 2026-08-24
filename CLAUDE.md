@@ -73,6 +73,19 @@ npm run test:run   # vitest 1회 실행
 - ⚠️ **skill의 보고 형식이 프롬프트를 이긴다.** `code-review` skill이 자체 형식을 갖고
   있어 처음에는 시급도 없이 영어로 달렸다. 그래서 프롬프트가 **skill에서 가져오는 것을
   "무엇을 볼지"로 한정하고 형식·언어·도구는 프롬프트가 우선한다**고 못 박는다.
+- **코멘트 문체는 정중한 합니다체다.** 프롬프트에 「문체」 절이 있고 대조표까지 들어 있다.
+  이 저장소 문서는 서술체("~한다")인데 그것을 그대로 가져오면 남의 코드를 반말로 지적하는
+  코멘트가 된다. **판정은 단정하고 지시는 제안형**("~하는 편이 좋겠습니다")으로 쓴다.
+- ⚠️ **워크플로를 고친 직후 바로 재실행하면 옛 버전이 돈다.** `pull_request` 워크플로는
+  head가 아니라 **merge ref**(`refs/pull/<N>/merge`)에서 읽히는데, main에 푸시한 뒤 그
+  ref가 다시 계산되기까지 시간이 걸린다. 2026-08-24에 이걸로 두 번 헛돌았다 —
+  코멘트 주인이 `claude[bot]`으로 바뀌지 않아 App 설치를 의심했지만 실제로는 액션에
+  `github_token`이 그대로 넘어가고 있었다. 재실행 전에 확인한다.
+
+  ```bash
+  gh api "repos/<owner>/<repo>/contents/.github/workflows/pr-review.yml?ref=refs%2Fpull%2F<N>%2Fmerge" \
+    --jq '.content' | base64 -d | grep -n "<바꾼 줄>"
+  ```
 - **인증은 `CLAUDE_CODE_OAUTH_TOKEN` 시크릿이다.** 코멘트를 다는 주인은 별개로
   Claude GitHub App(`github.com/apps/claude`)이고, 액션이 `id-token: write`로 받은 OIDC
   토큰을 App 토큰으로 바꿔 쓴다. **그 권한이 없으면 시작도 못 한다.**
