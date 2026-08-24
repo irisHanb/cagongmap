@@ -43,3 +43,6 @@ next-env.d.ts
 
 # playwright-cli 작업 산출물 (스냅샷·콘솔 로그)
 /.playwright-cli/
+
+# local git worktrees
+/.worktrees/
