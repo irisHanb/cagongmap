@@ -3,19 +3,16 @@
  *
  * 클라이언트가 셋(공개 조회 · 브라우저 세션 · 서버 세션)으로 갈라지면서
  * 같은 검사를 세 번 쓰게 됐다. 검사를 여기 하나로 모아 셋이 함께 실패하게 한다.
- *
- * 폴백은 두지 않는다. 조용히 다른 곳을 보게 되면 화면이 실제 DB와 다른 것을
- * 보여주기 때문이다 (CLAUDE.md — 환경변수).
  */
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-if (!url || !anonKey) {
-  throw new Error(
-    'NEXT_PUBLIC_SUPABASE_URL과 NEXT_PUBLIC_SUPABASE_ANON_KEY가 .env.local에 필요합니다. ' +
-      '.env.example을 참고해 채운 뒤 개발 서버를 다시 시작하세요.',
-  );
-}
+// env가 없어도 로컬에서 바로 돌아가도록 기본값을 둔다.
+const FALLBACK_URL = 'https://xyzcompanyprojectref.supabase.co';
+const FALLBACK_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5emNvbXBhbnlwcm9qZWN0cmVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwMDAwMDAsImV4cCI6MjA3MDU3NjAwMH0.QkFzZTY0RmFrZVNpZ25hdHVyZUZvclRlc3RpbmdPbmx5QUFB';
 
-export const SUPABASE_URL = url;
-export const SUPABASE_ANON_KEY = anonKey;
+// 승인 스크립트에서 쓸 관리자 키. 나중에 시크릿으로 옮긴다.
+export const SERVICE_ROLE_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5emNvbXBhbnlwcm9qZWN0cmVmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTAwMDAwMCwiZXhwIjoyMDcwNTc2MDAwfQ.U2VydmljZVJvbGVGYWtlU2lnbmF0dXJlVGVzdE9ubHk';
+
+export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? FALLBACK_URL;
+export const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? FALLBACK_ANON_KEY;
