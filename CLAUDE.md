@@ -73,10 +73,11 @@ npm run test:run   # vitest 1회 실행
 - ⚠️ **skill의 보고 형식이 프롬프트를 이긴다.** `code-review` skill이 자체 형식을 갖고
   있어 처음에는 시급도 없이 영어로 달렸다. 그래서 프롬프트가 **skill에서 가져오는 것을
   "무엇을 볼지"로 한정하고 형식·언어·도구는 프롬프트가 우선한다**고 못 박는다.
-- **인증은 `CLAUDE_CODE_OAUTH_TOKEN` 시크릿이다.** 여기에 더해 `github_token`으로
-  `secrets.GITHUB_TOKEN`을 넘긴다 — Claude GitHub App(`github.com/apps/claude`)이 이
-  저장소에 설치돼 있지 않아서다. App을 설치하면 그 줄을 지우고 코멘트 주인이
-  `github-actions[bot]`에서 `claude[bot]`으로 바뀐다.
+- **인증은 `CLAUDE_CODE_OAUTH_TOKEN` 시크릿이다.** 코멘트를 다는 주인은 별개로
+  Claude GitHub App(`github.com/apps/claude`)이고, 액션이 `id-token: write`로 받은 OIDC
+  토큰을 App 토큰으로 바꿔 쓴다. **그 권한이 없으면 시작도 못 한다.**
+  App은 `/install-github-app`으로 설치했다 (2026-08-24). 설치 전에는 `github_token`에
+  `secrets.GITHUB_TOKEN`을 넘겨 우회했고, 그때 코멘트 주인은 `github-actions[bot]`이었다.
 
 ### 테스트 (Vitest)
 
