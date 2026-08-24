@@ -9,6 +9,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  id-token: write   # 액션이 OIDC로 GitHub App 토큰을 받는다. 없으면 시작도 못 한다
 
 jobs:
   # 코드 리뷰 — 정확성·재사용·단순화. 내장 code-review skill이 기준이다.
