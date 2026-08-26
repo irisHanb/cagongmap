@@ -158,7 +158,7 @@ Supabase 쪽은 폴백을 두지 않았다. 원본이 하나여야 하는데 조
 카카오맵 무료 쿼터는 **개발자 계정의 첫 활성화 앱 1개에만** 제공된다. 새 앱을 만들지
 말고 기존 앱을 쓴다.
 
-## 구조 — 이음매 하나로 모은다
+## 구조 — 컴포넌트는 DB를 직접 부르지 않는다
 
 **컴포넌트는 DB·Storage·외부 SDK를 직접 건드리지 않는다.** 카페 데이터는
 `lib/cafes.ts`, 스키마는 `lib/schema.ts`, 사진 URL은 `lib/place-images.ts`를 통한다.
@@ -175,7 +175,7 @@ JSON에서 Supabase로 갈아탈 때 컴포넌트가 한 줄도 바뀌지 않은
 |---|---|
 | 코드 작성 기준 (KISS·DRY·경계) | `docs/code-guide.md` |
 | 색·타이포·간격·말투 | `DESIGN.md` |
-| 이음매·서버/브라우저 경계·인증 | `lib/CLAUDE.md` |
+| 데이터 접근 계층·서버/브라우저 경계·인증 | `lib/CLAUDE.md` |
 | 관리자 화면 (가드·저장 순서·UI) | `app/admin/CLAUDE.md` |
 | 카카오맵 SDK·마커·Map Shell | `components/map/CLAUDE.md` |
 | 스키마·RLS·마이그레이션 | `.claude/rules/supabase-db.md` · `docs/db-schema.md` |
