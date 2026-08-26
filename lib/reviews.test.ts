@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyToCounts, formatCounts, totalReviews, type ReviewCounts } from '@/lib/reviews';
+import { applyToCounts, formatTotal, totalReviews, type ReviewCounts } from '@/lib/reviews';
 
 /**
  * 순수 함수만 본다. 조회·저장은 Supabase에 붙는 일이라 여기서 검증하지 않고,
@@ -10,15 +10,15 @@ function counts(overrides: Partial<ReviewCounts> = {}): ReviewCounts {
   return { good: 0, normal: 0, bad: 0, ...overrides };
 }
 
-describe('formatCounts', () => {
-  it('평가가 하나도 없으면 0을 나열하지 않고 유도 문구를 낸다', () => {
-    // 카페 9곳 대부분이 이 상태다. "좋아요 0 · 보통 0 · 별로 0"은 정보가 아니다.
-    expect(formatCounts(counts())).toBe('아직 평가가 없어요. 첫 평가를 남겨보세요');
+describe('formatTotal', () => {
+  it('평가가 하나도 없으면 0을 말하지 않고 유도 문구를 낸다', () => {
+    // 카페 9곳 대부분이 이 상태다. "전체 0개"는 정보가 아니다.
+    expect(formatTotal(counts())).toBe('아직 평가가 없어요. 첫 평가를 남겨보세요');
   });
 
-  it('하나라도 있으면 셋을 모두 적는다', () => {
-    // bad가 0이어도 감추지 않는다. 좋은 것만 보이면 집계가 아니라 광고가 된다.
-    expect(formatCounts(counts({ good: 2, normal: 1 }))).toBe('좋아요 2 · 보통 1 · 별로 0');
+  it('하나라도 있으면 셋을 더한 수를 적는다', () => {
+    // 값별 숫자는 chip이 이모지 옆에 들고 있다. 이 줄은 합계만 말한다.
+    expect(formatTotal(counts({ good: 2, normal: 1 }))).toBe('전체 3개');
   });
 });
 

@@ -111,6 +111,11 @@ function LoginPromptProbe() {
   return <p>prompt:{loginPrompt ?? 'none'}</p>;
 }
 
+/** chip의 숫자. 이모지 옆에 붙어 있어 버튼 이름으로는 안 잡힌다. */
+function chipCount(label: string): string {
+  return screen.getByRole('button', { name: label }).textContent?.replace(/\P{N}/gu, '') ?? '';
+}
+
 function renderSection() {
   return render(
     <AuthProvider>
@@ -135,10 +140,15 @@ describe('ReviewSection', () => {
     expect(await screen.findByText('아직 평가가 없어요. 첫 평가를 남겨보세요')).toBeInTheDocument();
   });
 
-  it('집계가 있으면 셋을 모두 적는다', async () => {
+  it('집계가 있으면 chip마다 숫자를 붙이고 합계를 적는다', async () => {
     state.counts = { good: 2, normal: 1, bad: 0 };
     renderSection();
-    expect(await screen.findByText('좋아요 2 · 보통 1 · 별로 0')).toBeInTheDocument();
+
+    expect(await screen.findByText('전체 3개')).toBeInTheDocument();
+    // bad가 0이어도 감추지 않는다. 좋은 것만 보이면 집계가 아니라 광고가 된다.
+    expect(chipCount('좋아요')).toBe('2');
+    expect(chipCount('보통')).toBe('1');
+    expect(chipCount('별로')).toBe('0');
   });
 
   it('로그아웃 상태에서도 버튼 셋을 감추지 않는다', async () => {
@@ -172,12 +182,14 @@ describe('ReviewSection', () => {
 
     // 낙관적 갱신이라 요청을 기다리지 않고 화면이 먼저 움직인다.
     expect(screen.getByRole('button', { name: '좋아요' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByText('좋아요 2 · 보통 1 · 별로 0')).toBeInTheDocument();
+    expect(chipCount('좋아요')).toBe('2');
+    expect(screen.getByText('전체 3개')).toBeInTheDocument();
     expect(calls).toEqual(['upsert:good']);
 
     // 요청이 끝나면 서버 집계로 다시 맞춘다. 같은 값이어야 한다.
     await waitFor(() => expect(state.mine).toBe('good'));
-    expect(await screen.findByText('좋아요 2 · 보통 1 · 별로 0')).toBeInTheDocument();
+    expect(await screen.findByText('전체 3개')).toBeInTheDocument();
+    expect(chipCount('좋아요')).toBe('2');
   });
 
   it('같은 값을 다시 누르면 해제하고 집계를 되돌린다', async () => {
@@ -218,7 +230,9 @@ describe('ReviewSection', () => {
 
     await user.click(screen.getByRole('button', { name: '별로' }));
 
-    expect(await screen.findByText('좋아요 0 · 보통 1 · 별로 1')).toBeInTheDocument();
+    expect(await screen.findByText('전체 2개')).toBeInTheDocument();
+    expect(chipCount('좋아요')).toBe('0');
+    expect(chipCount('별로')).toBe('1');
     expect(calls).toEqual(['upsert:bad']);
   });
 
@@ -260,6 +274,8 @@ describe('ReviewSection', () => {
     expect(screen.getByRole('button', { name: '별로' })).toHaveAttribute('aria-pressed', 'false');
 
     // 집계도 서버 값과 어긋나지 않는다 (낙관적 계산만 믿으면 bad가 1로 남는다).
-    expect(await screen.findByText('좋아요 1 · 보통 0 · 별로 0')).toBeInTheDocument();
+    expect(await screen.findByText('전체 1개')).toBeInTheDocument();
+    expect(chipCount('좋아요')).toBe('1');
+    expect(chipCount('별로')).toBe('0');
   });
 });
