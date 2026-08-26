@@ -144,6 +144,7 @@ JSON에서 Supabase로 갈아탈 때 컴포넌트가 한 줄도 바뀌지 않은
 | 관리자 화면 (가드·저장 순서·UI) | `app/admin/CLAUDE.md` |
 | 카카오맵 SDK·마커·Map Shell | `components/map/CLAUDE.md` |
 | 스키마·RLS·마이그레이션 | `.claude/rules/supabase-db.md` · `docs/db-schema.md` |
+| TypeScript 컨벤션 | `.claude/rules/typescript.md` |
 | 테스트 | `.claude/rules/tests.md` |
 | 로깅 | `.claude/rules/logging.md` |
 | UI·Tailwind·React Compiler | `.claude/rules/ui.md` |
