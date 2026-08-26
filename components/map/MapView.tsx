@@ -9,6 +9,7 @@ import LoginRequiredModal from '@/components/auth/LoginRequiredModal';
 import BookmarkPanel from '@/components/bookmark/BookmarkPanel';
 import BookmarkProvider from '@/components/bookmark/BookmarkProvider';
 import CafeCard from '@/components/cafe/CafeCard';
+import CafeListPanel from '@/components/cafe/CafeListPanel';
 import EditRequestModal from '@/components/submission/EditRequestModal';
 import NewPlaceModal from '@/components/submission/NewPlaceModal';
 import CafeMarkers from './CafeMarkers';
@@ -74,9 +75,10 @@ function MapShell({ cafes }: { cafes: Cafe[] }) {
         />
       </KakaoMap>
 
-      {/* 탐색 결과를 늘어놓는 곳이 아니라 지도 탐색을 시작하는 dock이다.
-          DESIGN.md Left Panel 순서의 1-3번, 5번, 6번이 여기 있다.
-          4번 검색바만 아직 스코프 밖이라 자리를 만들지 않았다. */}
+      {/* 지도 탐색을 시작하는 dock이다. DESIGN.md Left Panel 순서의 1-3번, 5-8번이
+          여기 있다. 4번 검색바만 아직 스코프 밖이라 자리를 만들지 않았다.
+          8번 전체 목록이 붙어도 dock이 지도를 밀어내지 않는 것은 목록 자체가
+          스크롤하기 때문이다 (globals.css .dock-cafe-list). */}
       <div className="brand-dock" ref={dockRef}>
         <p className="eyebrow">WORK CAFE MAP</p>
         <h1>카공맵</h1>
@@ -97,6 +99,9 @@ function MapShell({ cafes }: { cafes: Cafe[] }) {
         {/* 북마크에서 카페를 고르면 상세가 열린다. 지도를 그쪽으로 옮기지는
             않는다 — 목록은 탐색 도구가 아니라 저장 목록이다. */}
         <BookmarkPanel onSelect={handleSelect} />
+        {/* 전체 목록은 dock 맨 아래다. 북마크(내가 고른 것)를 먼저 보고, 그 아래에서
+            아직 고르지 않은 카페를 고른다. */}
+        <CafeListPanel cafes={cafes} onSelect={handleSelect} />
       </div>
 
       {/* key로 카페마다 새로 마운트해 사진 슬라이드를 첫 장으로 되돌린다 */}
