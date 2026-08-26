@@ -38,6 +38,27 @@
 `push --force` · `reset --hard` · 원격 브랜치 삭제 · PR 닫기 · 태그 삭제 ·
 `git commit --no-verify` — 전부 지시받았을 때만 한다.
 
+### 이건 hook이 실제로 막는다
+
+`.claude/hooks/block-destructive.sh`가 PreToolUse로 붙어 있어 **실행 전에 거부하고
+이유를 낸다.** 규칙을 기억에 맡기지 않으려는 것이다.
+
+| 막는 것 | 통과하는 것 |
+|---|---|
+| `.env`·`.env.local` 편집, 셸에서 덮어쓰기·삭제 | `.env.example` (git에 있다) |
+| `rm -r`·`rm -f`·`git clean -f`·`find -delete` | `.next`·`node_modules`·`/tmp`·스크래치패드, 플래그 없는 `rm <파일>` |
+| `drop table`·`drop schema`·`truncate`·where 없는 `delete`·`supabase db reset` | `drop policy`·`drop function`·`drop constraint` (마이그레이션의 정상 구문) |
+
+- **막는 것은 실행이지 작성이 아니다.** 마이그레이션 파일에 `drop`을 적는 Write도,
+  히어독으로 문서에 그 명령을 적는 것도 통과한다. 저장소의 drop 23건이 전부
+  policy·function·constraint·type이다.
+- **검사는 `.claude/hooks/test-block-destructive.sh`가 53가지로 확인한다.** hook을
+  고치면 이것을 돌린다. 두 번 다 이 파일이 잡았다 — 처음에는 `[[ =~ ]]` 안의 대괄호
+  클래스가 구문 오류를 내서 **아무것도 막지 않고 통과**했고, 그다음에는 히어독 본문의
+  문서 텍스트를 명령으로 오인해 CLAUDE.md 수정을 막았다.
+- 막힌 작업이 정말 필요하면 **사용자가 직접 실행한다.** 프롬프트에 `!`를 붙이면 된다.
+- lint·typecheck·test는 여기 없다. `.githooks/pre-commit`이 이미 돌린다 (`docs/ci.md`).
+
 ### 그밖에
 
 - **`.env.local`을 읽어서 값을 출력하거나 커밋하지 않는다.** 키 이름까지만 말한다.
