@@ -152,6 +152,7 @@ judge against the acceptance criteria.
      human, the verifier runs it.
    - the changed scope (`git status --short` / the diff) and relevant files,
    - the evidence you collected while building.
+   - the original request, so it can tell asked-for changes from stray ones.
    Instruct it to follow the `verify` skill: judge **each** acceptance criterion
    with the right verification level and report in the `verify` output format - an
    overall verdict plus a per-criterion result (checked / failed / not checked)
@@ -169,6 +170,9 @@ judge against the acceptance criteria.
      second pass; if it still fails, report the remaining gap rather than looping.
    - Blocked -> stop and report the blocker that needs a human or a decision.
      Surface it as a remaining item; do not bury it under a Pass.
+   - Out-of-scope changes reported -> revert them or, when you are unsure they
+     are yours to revert, list them for the user. Do not report Done with stray
+     changes unmentioned.
 
 Do not claim completion on a verdict you produced yourself, on skipped
 verification, or on a weaker target than the criteria asked for. Report the

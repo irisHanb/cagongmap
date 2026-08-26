@@ -159,6 +159,13 @@ break, not to withhold approval on vague doubt.
 10. Report only evidence you actually collected.
 11. Say what remains unchecked.
 
+## Scope Check
+
+Compare `git status --short` against what was actually asked for. Any file
+changed outside the request - an unrelated refactor, a formatting-only file, a
+deleted file nobody asked to delete - is listed by name and caps the verdict at
+`Partial`. `AGENTS.md` is the exception: `next dev` rewrites it.
+
 ## Evidence Rules
 
 - A command is evidence only if it actually ran.
@@ -236,4 +243,8 @@ Pass | Partial | Fail | Blocked
 ## Remaining Risk
 
 - ...
+
+## Out Of Scope Changes
+
+- file - change nobody asked for. "none" when clean
 ```
