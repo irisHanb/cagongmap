@@ -12,6 +12,7 @@ import CafeCard from '@/components/cafe/CafeCard';
 import CafeListPanel from '@/components/cafe/CafeListPanel';
 import EditRequestModal from '@/components/submission/EditRequestModal';
 import NewPlaceModal from '@/components/submission/NewPlaceModal';
+import { filterCafes } from '@/lib/cafe-search';
 import CafeMarkers from './CafeMarkers';
 import KakaoMap from './KakaoMap';
 import MapCenterInset from './MapCenterInset';
@@ -44,9 +45,14 @@ function MapShell({ cafes }: { cafes: Cafe[] }) {
   const [selected, setSelected] = useState<Cafe | null>(null);
   /** 열려 있는 폼 모달. 로그인 유도와 달리 화면당 하나로 제한할 이유가 없어 따로 둔다 */
   const [form, setForm] = useState<'edit' | 'new' | null>(null);
+  // 첫 렌더는 빈 검색어다 (R10). 목록과 마커가 같은 걸러진 배열을 받아야 하므로(R3)
+  // 상태는 그 둘을 함께 쥔 여기에 둔다 — CafeListPanel 안에 두면 마커가 값을 모른다.
+  const [query, setQuery] = useState('');
   const { loginPrompt, dismissLoginPrompt, requireLogin } = useAuth();
   // dock이 지도 중심을 가리는지 재려면 실제 크기가 필요하다 (MapCenterInset).
   const dockRef = useRef<HTMLDivElement>(null);
+
+  const filteredCafes = filterCafes(cafes, query);
 
   // CafeMarker의 useEffect 의존성으로 들어가므로 참조를 고정한다.
   const handleSelect = useCallback((cafe: Cafe) => setSelected(cafe), []);
@@ -69,15 +75,16 @@ function MapShell({ cafes }: { cafes: Cafe[] }) {
         {/* 좁은 화면에서 dock 뒤에 깔리는 중심을 보이는 자리로 내린다 */}
         <MapCenterInset obstructionRef={dockRef} />
         <CafeMarkers
-          cafes={cafes}
+          cafes={filteredCafes}
           selectedId={selected?.id ?? null}
           onSelect={handleSelect}
         />
       </KakaoMap>
 
-      {/* 지도 탐색을 시작하는 dock이다. DESIGN.md Left Panel 순서의 1-3번, 5-8번이
-          여기 있다. 4번 검색바만 아직 스코프 밖이라 자리를 만들지 않았다.
-          8번 전체 목록이 붙어도 dock이 지도를 밀어내지 않는 것은 목록 자체가
+      {/* 지도 탐색을 시작하는 dock이다. DESIGN.md Left Panel 순서 1-7번이 여기 있다.
+          검색 입력칸은 7번 카페 전체 목록 상자 안에 있다 (2026-08-26) — 별도
+          순서를 차지하지 않는다.
+          7번 전체 목록이 붙어도 dock이 지도를 밀어내지 않는 것은 목록 자체가
           스크롤하기 때문이다 (globals.css .dock-cafe-list). */}
       <div className="brand-dock" ref={dockRef}>
         <p className="eyebrow">WORK CAFE MAP</p>
@@ -100,8 +107,14 @@ function MapShell({ cafes }: { cafes: Cafe[] }) {
             않는다 — 목록은 탐색 도구가 아니라 저장 목록이다. */}
         <BookmarkPanel onSelect={handleSelect} />
         {/* 전체 목록은 dock 맨 아래다. 북마크(내가 고른 것)를 먼저 보고, 그 아래에서
-            아직 고르지 않은 카페를 고른다. */}
-        <CafeListPanel cafes={cafes} onSelect={handleSelect} />
+            아직 고르지 않은 카페를 고른다. 검색 입력칸은 이 패널 안, 제목과 목록
+            사이에 있다 — 값의 주인은 여기(MapShell)지만 자리는 목록 상자 안이다. */}
+        <CafeListPanel
+          cafes={filteredCafes}
+          query={query}
+          onQueryChange={setQuery}
+          onSelect={handleSelect}
+        />
       </div>
 
       {/* key로 카페마다 새로 마운트해 사진 슬라이드를 첫 장으로 되돌린다 */}
