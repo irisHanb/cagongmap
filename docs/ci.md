@@ -127,6 +127,11 @@ App은 `/install-github-app`으로 설치했다 (2026-08-24). 설치 전에는 `
   `AskUserQuestion`에 답할 사람이 없다.
 - 저장소 규칙은 main 직접 커밋이지만(CLAUDE.md 「커밋」) **이 워크플로만 브랜치를 판다** —
   `agent/issue-<번호>-<슬러그>`. PR을 열려면 브랜치가 있어야 한다.
+- **UI를 바꾼 PR에는 before/after 스크린샷이 들어간다** (CLAUDE.md 「PR」). 러너에는
+  브라우저가 없으므로 에이전트가 `npx playwright install --with-deps chromium`을 먼저
+  돌린다. after를 찍고 base sha로 돌아가 before를 찍는다 — 포트 3030을 겹쳐 쓰지 않는다.
+  ⚠️ **이미지는 `docs/pr-shots/`에 커밋된다.** 저장소에 바이너리가 쌓이므로 머지 뒤에
+  지울지는 사람이 정한다.
 
 ### ⚠️ 에이전트가 연 PR에 ci.yml·pr-review.yml이 안 돌 수 있다
 
