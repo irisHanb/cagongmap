@@ -3,7 +3,7 @@ import { NOISE_LABEL, OUTLET_LABEL, WORK_POLICY_LABEL } from '@/types/cafe';
 import type { Cafe } from '@/types/cafe';
 
 /**
- * ★ JSON-LD 이음매
+ * ★ JSON-LD 조립
  *
  * lib/cafes.ts와 같은 규칙이다 — 컴포넌트가 스키마를 직접 조립하지 않는다.
  * 2026-08-21 SEO 감사에서 JSON-LD가 0개로 나와 넣었다

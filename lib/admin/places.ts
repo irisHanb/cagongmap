@@ -11,7 +11,7 @@ import { PLACE_IMAGE_BUCKET, placeImageUrl } from '@/lib/place-images';
 import { createServerSupabase } from '@/lib/supabase-server';
 
 /**
- * ★ 장소 관리 이음매 (서버 전용)
+ * ★ 장소 관리 데이터 접근 계층 (서버 전용)
  *
  * `lib/cafes.ts`와 같은 규칙이다 — 컴포넌트는 `places` 테이블도 Storage도 직접
  * 건드리지 않는다. 다른 점 둘:

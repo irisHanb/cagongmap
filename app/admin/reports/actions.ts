@@ -9,7 +9,7 @@ import { log, reasonOf, requestId } from '@/lib/log';
  * 반려.
  *
  * `requireCurator()`는 `rejectSubmission()` 안에서 부른다 — 이 파일의 액션이 늘어도
- * 판정을 빠뜨릴 자리가 생기지 않게 이음매 쪽에 붙여 두었다.
+ * 판정을 빠뜨릴 자리가 생기지 않게 `lib/admin/reports.ts` 쪽에 붙여 두었다.
  *
  * 성공/실패를 던지지 않고 돌려주는 이유: 서버 액션이 던지면 프로덕션 빌드에서
  * 메시지가 지워지고 클라이언트는 "An error occurred in the Server Components render"만

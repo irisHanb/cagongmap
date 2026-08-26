@@ -80,7 +80,7 @@ export function toCafe(row: PlaceRow): Cafe {
     work_policy: row.work_policy,
     // DB에는 버킷 경로가, Cafe에는 바로 렌더할 수 있는 공개 URL이 담긴다.
     // 변환을 여기서 하는 덕분에 컴포넌트는 사진이 어느 버킷에서 오는지 모른다
-    // — 이 이음매를 열어둔 이유가 그것이다 (lib/place-images.ts).
+    // — 변환을 한곳에 모아 둔 이유가 그것이다 (lib/place-images.ts).
     photos: row.photos.map(placeImageUrl),
     tags: row.tags,
     last_verified: row.last_verified,
@@ -92,7 +92,7 @@ export function toCafe(row: PlaceRow): Cafe {
  *
  * `getCafes`·`getCafeById`는 서버 컴포넌트가 부르지만 `getCafeByNaverUrl`은 제보
  * 모달(클라이언트)이 부른다 — 그쪽 로그는 사용자 콘솔에 찍힐 뿐이다. 같은 파일에
- * 두 환경이 섞여 있는 것은 이 이음매의 성질이고, 로그 형식을 갈라 놓으면 그 사실이
+ * 두 환경이 섞여 있는 것은 이 파일의 성질이고, 로그 형식을 갈라 놓으면 그 사실이
  * 오히려 흐려져서 하나로 둔다.
  */
 
