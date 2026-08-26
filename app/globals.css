@@ -907,17 +907,34 @@ a {
 }
 
 .review-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   width: 100%;
-  height: 40px;
+  height: 44px;
   padding: 0;
   border: 1px solid var(--outline-variant);
   border-radius: var(--r-full);
   background: var(--surface-container-lowest);
   color: var(--on-surface-variant);
   font-family: inherit;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   cursor: pointer;
+}
+
+/* 글자가 빠진 자리를 이모지가 받는다. 22px라 옆의 15px 숫자보다 먼저 읽힌다. */
+.review-chip__emoji {
+  font-size: 22px;
+  line-height: 1;
+}
+
+/* 숫자가 0에서 10으로 넘어가도 이모지가 움직이지 않게 폭을 잡아 둔다. */
+.review-chip__count {
+  min-width: 14px;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
 }
 
 .review-chip:hover {
@@ -939,12 +956,12 @@ a {
 }
 
 .review__counts {
-  min-height: 16px;
+  min-height: 18px;
   margin-top: var(--sp-sm);
   color: var(--on-surface-variant);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 16px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 18px;
 }
 
 /* 확인일 아래의 작은 텍스트 버튼. CTA가 아니다 — 상세의 주인공은 카페다. */

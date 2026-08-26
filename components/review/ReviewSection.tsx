@@ -5,9 +5,10 @@ import type { Cafe } from '@/types/cafe';
 import {
   applyToCounts,
   clearReview,
-  formatCounts,
+  formatTotal,
   getMyReview,
   getReviewCounts,
+  REVIEW_EMOJI,
   REVIEW_LABEL,
   REVIEW_VALUES,
   setReview,
@@ -134,8 +135,13 @@ export default function ReviewSection({ cafe }: { cafe: Cafe }) {
                 className={`review-chip review-chip--${value}${on ? ' review-chip--on' : ''}`}
                 onClick={() => choose(value)}
                 aria-pressed={on}
+                aria-label={REVIEW_LABEL[value]}
               >
-                {REVIEW_LABEL[value]}
+                <span className="review-chip__emoji" aria-hidden="true">
+                  {REVIEW_EMOJI[value]}
+                </span>
+                {/* 조회 전에는 숫자를 말하지 않는다. 자리는 CSS가 잡아 둔다. */}
+                <span className="review-chip__count">{counts ? counts[value] : ''}</span>
               </button>
             </li>
           );
@@ -144,7 +150,7 @@ export default function ReviewSection({ cafe }: { cafe: Cafe }) {
 
       {/* 조회 전에는 숫자를 말하지 않되 줄은 비워둔다. 나중에 끼어들면서
           아래 내용을 밀어내지 않게 하려는 것이다. */}
-      <p className="review__counts">{counts ? formatCounts(counts) : ' '}</p>
+      <p className="review__counts">{counts ? formatTotal(counts) : ' '}</p>
 
       {/* 실패에 색을 주지 않는다 — 색이 드는 것은 좋은 조건뿐이다 (DESIGN.md) */}
       {error && <p className="form-error">{error}</p>}

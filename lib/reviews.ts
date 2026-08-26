@@ -25,11 +25,21 @@ export interface ReviewCounts {
 
 export const REVIEW_VALUES: ReviewValue[] = ['good', 'normal', 'bad'];
 
-/** DESIGN.md 말투 기준. 별점이 아니라 한 마디로 읽히게 둔다. */
+/**
+ * chip에는 이모지만 그리고 이 말은 aria-label로만 남는다. 화면에서 사라져도
+ * 스크린리더와 테스트는 여전히 `좋아요`로 버튼을 부른다.
+ */
 export const REVIEW_LABEL: Record<ReviewValue, string> = {
   good: '좋아요',
   normal: '보통',
   bad: '별로',
+};
+
+/** 표정 셋으로 맞춘다. 세 값이 같은 종류로 읽혀야 눈이 비교한다. */
+export const REVIEW_EMOJI: Record<ReviewValue, string> = {
+  good: '😊',
+  normal: '😐',
+  bad: '😕',
 };
 
 export const EMPTY_COUNTS: ReviewCounts = { good: 0, normal: 0, bad: 0 };
@@ -39,17 +49,19 @@ export function totalReviews(counts: ReviewCounts): number {
 }
 
 /**
- * "좋아요 3 · 보통 1 · 별로 0" 한 줄.
+ * chip 아래 한 줄. 값별 숫자는 chip이 이미 이모지 옆에 들고 있으므로 여기서는
+ * 합계만 말한다.
  *
- * 0건이면 숫자 대신 유도 문구를 돌려준다. `0 · 0 · 0`은 정보가 아니라 소음이고,
+ * 0건이면 `전체 0개` 대신 유도 문구를 돌려준다. 0은 정보가 아니라 소음이고,
  * 카페 9곳 대부분이 그 상태다.
  */
-export function formatCounts(counts: ReviewCounts): string {
-  if (totalReviews(counts) === 0) {
+export function formatTotal(counts: ReviewCounts): string {
+  const total = totalReviews(counts);
+  if (total === 0) {
     return '아직 평가가 없어요. 첫 평가를 남겨보세요';
   }
 
-  return REVIEW_VALUES.map((value) => `${REVIEW_LABEL[value]} ${counts[value]}`).join(' · ');
+  return `전체 ${total}개`;
 }
 
 /** 낙관적 갱신용. 요청을 기다리지 않고 화면의 집계를 먼저 옮긴다. */
