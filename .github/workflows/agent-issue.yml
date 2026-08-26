@@ -1,0 +1,151 @@
+name: Agent Issue
+
+# agent:ready 라벨이 붙는 순간에만 돈다. issues: [opened]를 넣지 않는 이유는,
+# 이슈를 여는 것과 에이전트에게 맡기는 것이 다른 결정이기 때문이다.
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write        # 브랜치를 만들고 푸시한다
+  issues: write          # 라벨을 갈아 끼우고 댓글을 남긴다
+  pull-requests: write   # PR을 연다
+  id-token: write        # OIDC를 Claude GitHub App 토큰으로 바꾼다 (docs/ci.md 「인증」)
+
+# 같은 이슈에 두 번 돌지 않는다. 라벨을 뗐다 붙이면 labeled 이벤트가 다시 오는데,
+# 그때 진행 중인 실행을 취소하고 새로 시작한다 — 두 벌이 같은 브랜치에 푸시하는 것보다 낫다.
+concurrency:
+  group: agent-issue-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  agent:
+    # agent:running이 이미 붙어 있으면 다른 실행이 잡고 있다는 뜻이다.
+    if: >-
+      github.event.label.name == 'agent:ready' &&
+      !contains(github.event.issue.labels.*.name, 'agent:running')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30   # 최대 실행 시간. 넘으면 아래 blocked 스텝이 받는다
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ISSUE: ${{ github.event.issue.number }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 라벨 넷이 없으면 만든다. 이미 있으면 색·설명을 건드리지 않는다.
+      - name: 라벨 준비
+        run: |
+          create() { gh label create "$1" --color "$2" --description "$3" 2>/dev/null || true; }
+          create 'agent:ready'   0e8a16 '에이전트가 처리할 이슈'
+          create 'agent:running' fbca04 '에이전트가 작업 중'
+          create 'agent:review'  1d76db 'PR이 열렸고 사람 리뷰를 기다린다'
+          create 'agent:blocked' d93f0b '에이전트가 막혔다 — 이슈 댓글에 이유가 있다'
+
+      - name: ready → running
+        run: gh issue edit "$ISSUE" --remove-label 'agent:ready' --add-label 'agent:running'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      # npm run verify와 build가 places를 읽는다. 더미 값으로는 fetch failed로 멈춘다 (ci.yml과 같다).
+      - name: .env.local 생성
+        run: |
+          cat > .env.local <<EOF
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_KAKAO_MAP_KEY=${{ secrets.NEXT_PUBLIC_KAKAO_MAP_KEY }}
+          EOF
+
+      - name: git 신원
+        run: |
+          git config user.name  'claude[bot]'
+          git config user.email '209825114+claude[bot]@users.noreply.github.com'
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            ISSUE NUMBER: ${{ github.event.issue.number }}
+            ISSUE TITLE: ${{ github.event.issue.title }}
+            RUN URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            이 이슈를 구현하고 PR까지 연다. 본문은 `gh issue view $ISSUE --json title,body,comments`로 읽는다.
+
+            ## 순서
+
+            1. `agent/issue-<번호>-<영문-슬러그>` 브랜치를 판다.
+               (저장소 규칙은 main 직접 커밋이지만, PR을 열려면 브랜치가 필요하다.)
+            2. `Skill` 도구로 `implement` skill을 불러 이슈 본문을 요구사항으로 삼아 구현한다.
+            3. `npm run verify`를 돌린다. 실패하면 고치고 다시 돌린다.
+            4. 커밋하고 푸시한다. 커밋 메시지는 `type: 한국어 서술체`다 (CLAUDE.md 「커밋」).
+            5. `Skill` 도구로 `pr` skill을 불러 PR 본문을 쓰고, `gh pr create`로 연다.
+               본문 마지막에 `Closes #<번호>`를 넣는다.
+            6. 마지막에 `/tmp/agent-outcome` 파일을 쓴다. 첫 줄이 `done`이다.
+
+            ## 하지 않는 것
+
+            - **머지하지 않는다. 배포하지 않는다.** PR을 여는 데서 멈춘다.
+            - `AskUserQuestion`을 쓰지 않는다. CI에는 답할 사람이 없다.
+            - CLAUDE.md 「손대지 않는 것」을 그대로 따른다 — 운영 DB의 행을 지우거나
+              `.env.local`을 건드리거나 `push --force`를 하지 않는다.
+
+            ## 판단이 필요한 지점
+
+            사람에게 물어야 할 것 같은 지점에서 멈추지 않는다. **네가 먼저 판단하고 진행한다.**
+            대신 무엇을 어떻게 판단했는지 PR 본문 마지막에 이 절로 남긴다.
+
+            ```
+            ## 사람이 확인할 판단
+
+            - **<무엇을 정해야 했는가>** — <어느 쪽으로 정했는가>. 근거: <한 줄>.
+              뒤집으려면: <무엇을 바꾸면 되는가>.
+            ```
+
+            판단한 것이 없으면 이 절을 넣지 않는다. 없는 항목을 만들지 않는다.
+
+            ## 막혔을 때
+
+            진행할 수 없으면 **PR을 열지 않는다.** 대신 두 가지를 한다.
+
+            - `gh issue comment $ISSUE`로 이유를 남긴다 — 어디까지 했고, 무엇이 없어서
+              막혔고, 사람이 무엇을 해 주면 되는지. 한국어 합니다체로 쓴다.
+            - `/tmp/agent-outcome`의 첫 줄을 `blocked`로 쓰고, 둘째 줄부터 한 줄 요약을 적는다.
+
+            막힌 것으로 치는 경우: 요구사항이 상충해서 어느 쪽도 고를 수 없다,
+            운영 DB의 데이터를 지워야만 된다, 없는 자격증명이 필요하다,
+            `npm run verify`를 세 번 고쳐도 통과하지 못한다.
+
+            **애매한 것을 막혔다고 하지 않는다.** 정하기 어려운 것은 판단하고 위 절에 적는다.
+          claude_args: |
+            --allowedTools "Skill,Read,Write,Edit,Grep,Glob,Bash"
+
+      # 에이전트가 done을 남겼을 때만 review로 넘긴다. 파일이 없으면 blocked로 본다.
+      - name: running → review
+        run: |
+          if [ "$(head -n1 /tmp/agent-outcome 2>/dev/null)" = "done" ]; then
+            gh issue edit "$ISSUE" --remove-label 'agent:running' --add-label 'agent:review'
+          else
+            echo "에이전트가 done을 남기지 않았다" >&2
+            exit 1
+          fi
+
+      # 어느 스텝에서 실패했든(타임아웃 포함) 여기로 온다.
+      - name: running → blocked
+        if: failure()
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          reason=$(tail -n +2 /tmp/agent-outcome 2>/dev/null)
+          gh issue edit "$ISSUE" --remove-label 'agent:running' --add-label 'agent:blocked' || true
+          printf '%s\n\n%s\n\n로그: %s\n\n다시 맡기려면 `agent:blocked`를 떼고 `agent:ready`를 붙이면 됩니다.\n' \
+            '에이전트 실행이 끝나지 못했습니다. `agent:blocked`로 바꿨습니다.' \
+            "${reason:-이유가 기록되지 않았습니다. 로그에서 어느 스텝이 실패했는지 확인해 주세요.}" \
+            "$RUN_URL" \
+            | gh issue comment "$ISSUE" --body-file -
