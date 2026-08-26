@@ -11,7 +11,7 @@ allowed-tools:
   - Read
   - Grep
   - Glob
-  - Task
+  - Agent
   - AskUserQuestion
 ---
 
@@ -120,11 +120,11 @@ How to run it:
 
 1. Frame each thing you are about to call "Pass" as an explicit claim, e.g.
    "the new auth guard rejects expired tokens" or "the migration is reversible".
-2. For each high-stakes claim, spawn independent skeptic subagents with the
-   `Task` tool. Give each one the claim, the relevant files/diff, and the
-   evidence you already collected, then instruct it to **try to refute the
-   claim**, not to confirm it. Run skeptics for separate claims in parallel
-   (multiple `Task` calls in one message).
+2. For each high-stakes claim, spawn independent skeptics with the `Agent`
+   tool using `subagent_type: "change-reviewer"`. Give each one the claim, the
+   relevant files/diff, and the evidence you already collected, then instruct it
+   to **try to refute the claim**, not to confirm it. Run skeptics for separate
+   claims in parallel (multiple `Agent` calls in one message).
 3. Each skeptic returns: `refuted` or `not_refuted`, plus a concrete reason. A
    refutation only counts if it names a specific failing case, file, line, or
    reproduction. "Might be risky" with no concrete case does not count as a
@@ -155,7 +155,7 @@ break, not to withhold approval on vague doubt.
    or unrelated.
 8. If UI/runtime changed, inspect the real route or runtime target.
 9. If the change is large or high-stakes (see Level 4 triggers), spawn
-   adversarial skeptic subagents on the key claims before settling the verdict.
+   `change-reviewer` skeptics on the key claims before settling the verdict.
 10. Report only evidence you actually collected.
 11. Say what remains unchecked.
 

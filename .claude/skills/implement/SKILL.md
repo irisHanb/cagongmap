@@ -11,7 +11,7 @@ allowed-tools:
   - Glob
   - Write
   - Edit
-  - Task
+  - Agent
   - TaskCreate
   - TaskList
   - TaskGet
@@ -141,7 +141,8 @@ The same context that wrote the change is the worst judge of it. So when the
 build is done, spawn a fresh verifier that did not write the code and let it
 judge against the acceptance criteria.
 
-1. Spawn one independent verifier subagent with the `Task` tool. Give it:
+1. Spawn one independent verifier with the `Agent` tool, using
+   `subagent_type: "change-reviewer"`. Give it:
    - the acceptance criteria from `prd.md` (or the task) as the rubric - **every**
      criterion, not a subset,
    - both the PRD's `Verification - Agent` and `Verification - Human` sections as
