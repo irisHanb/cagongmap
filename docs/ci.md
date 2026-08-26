@@ -73,6 +73,27 @@ gh api "repos/<owner>/<repo>/contents/.github/workflows/pr-review.yml?ref=refs%2
   --jq '.content' | base64 -d | grep -n "<바꾼 줄>"
 ```
 
+### ⚠️ `--allowedTools`는 기본 도구를 대체한다 — 빠지면 초록불로 빈손이 된다
+
+`claude_args`의 `--allowedTools`에 적지 않은 도구는 **못 쓴다.** 기본 집합에 더하는
+것이 아니라 통째로 갈아끼운다.
+
+2026-08-26까지 두 job 모두 `Read`·`Grep`·`Glob` 없이 돌았다. `review`는 그 탓에
+**PR #4와 #6에서 인라인 0건·요약 0건으로 끝나면서 체크는 SUCCESS였다** —
+`permission_denials_count: 2`, `num_turns: 3`, 비용 $1.35. 리뷰가 없는 것과 리뷰가
+깨끗한 것이 화면에서 구별되지 않았다.
+
+- **초록불이 리뷰가 돌았다는 뜻이 아니다.** 워크플로를 고친 뒤에는 실행 결과의
+  `permission_denials_count`와 실제 코멘트 수를 함께 본다.
+
+```bash
+gh run view --job <JOB_ID> --log | grep -E "num_turns|permission_denials_count"
+gh api repos/<owner>/<repo>/pulls/<N>/comments --jq 'length'
+```
+
+- `security`는 `Bash(grep:*)`만으로 보고서가 나와 증상이 드러나지 않았지만 결함은
+  같았다. 둘 다 고쳤다.
+
 ### 인증
 
 **`CLAUDE_CODE_OAUTH_TOKEN` 시크릿이다.** 코멘트를 다는 주인은 별개로
