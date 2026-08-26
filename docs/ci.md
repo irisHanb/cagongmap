@@ -15,12 +15,13 @@
 
 ## GitHub Actions
 
-워크플로우가 둘이다. **역할이 다르고 도는 시점도 다르다.**
+워크플로우가 셋이다. **역할이 다르고 도는 시점도 다르다.**
 
 | 파일 | 언제 | 무엇 |
 |---|---|---|
 | `.github/workflows/ci.yml` | main push · 모든 PR (커밋마다) | `lint` · `typecheck` · `test:run` · `build` |
 | `.github/workflows/pr-review.yml` | **PR이 열릴 때만** (`opened`·`reopened`) | 코드 리뷰 · 보안 점검 |
+| `.github/workflows/agent-issue.yml` | **이슈에 `agent:ready`가 붙을 때** | 이슈 구현 → PR 생성 |
 
 - **PR Review는 `synchronize`를 넣지 않는다.** 넣으면 push 한 번에 리뷰가 한 벌씩
   쌓이고 같은 지적이 같은 줄에 중복된다.
@@ -57,3 +58,36 @@ Claude GitHub App(`github.com/apps/claude`)이고, 액션이 `id-token: write`�
 토큰을 App 토큰으로 바꿔 쓴다. **그 권한이 없으면 시작도 못 한다.**
 App은 `/install-github-app`으로 설치했다 (2026-08-24). 설치 전에는 `github_token`에
 `secrets.GITHUB_TOKEN`을 넘겨 우회했고, 그때 코멘트 주인은 `github-actions[bot]`이었다.
+
+## 이슈를 에이전트에게 맡기기
+
+`.github/workflows/agent-issue.yml`이 이슈 하나를 받아 브랜치를 파고 구현한 뒤 PR을
+연다. **머지도 배포도 하지 않는다** — 사람이 리뷰하는 지점에서 멈춘다.
+
+라벨 넷이 상태다. 없으면 워크플로가 첫 스텝에서 만든다.
+
+| 라벨 | 뜻 |
+|---|---|
+| `agent:ready` | 사람이 붙인다. **이 라벨이 붙는 순간에만 실행된다** |
+| `agent:running` | 에이전트가 작업 중. 시작할 때 `agent:ready`와 바뀐다 |
+| `agent:review` | PR이 열렸다. 사람 리뷰를 기다린다 |
+| `agent:blocked` | 막혔다. **이유가 이슈 댓글에 있다** |
+
+- **중복 실행을 막는 것이 둘이다.** `concurrency` 그룹이 이슈 번호별로 하나만 돌게 하고,
+  job의 `if`가 `agent:running`이 이미 붙은 이슈를 걸러낸다.
+- **최대 30분이다** (`timeout-minutes`). 넘으면 job이 실패하고 `agent:blocked`로 간다.
+- **끝 판정은 `/tmp/agent-outcome` 파일이다.** 에이전트가 첫 줄에 `done`을 쓴 경우에만
+  `agent:review`로 넘긴다. 파일이 없거나 다른 값이면 `agent:blocked`다 — 에이전트가
+  중간에 죽어도 `agent:running`으로 남지 않는다.
+- **사람 판단이 필요한 지점에서 멈추지 않는다.** 프롬프트가 먼저 판단하고 PR 본문
+  마지막 「사람이 확인할 판단」 절에 무엇을 어떻게 정했는지 적게 한다. CI에는
+  `AskUserQuestion`에 답할 사람이 없다.
+- 저장소 규칙은 main 직접 커밋이지만(CLAUDE.md 「커밋」) **이 워크플로만 브랜치를 판다** —
+  `agent/issue-<번호>-<슬러그>`. PR을 열려면 브랜치가 있어야 한다.
+
+### ⚠️ 에이전트가 연 PR에 ci.yml·pr-review.yml이 안 돌 수 있다
+
+`secrets.GITHUB_TOKEN`으로 만든 PR은 다른 워크플로를 트리거하지 않는 것이 GitHub의
+규칙이다. 에이전트가 Claude GitHub App 토큰으로 PR을 열면 돌고, `GH_TOKEN`(=
+`GITHUB_TOKEN`)으로 열면 돌지 않는다. **첫 실행에서 PR의 Checks 탭을 확인한다.**
+비어 있으면 PR을 닫았다 다시 열면 사람 계정 이벤트로 트리거된다.
