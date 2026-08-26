@@ -25,8 +25,10 @@ reviewed or shipped through a pull request.
 3. Identify unrelated local changes and keep them out of the PR.
 4. Confirm which verification commands or runtime checks actually ran.
 5. Draft a short PR title.
-6. Draft a PR body with summary, verification, and risks.
-7. Commit or push only when the user explicitly asks.
+6. If the change touches UI, capture before/after screenshots (see UI
+   Screenshots).
+7. Draft a PR body with summary, verification, and risks.
+8. Commit or push only when the user explicitly asks.
 
 ## Rules
 
@@ -36,13 +38,38 @@ reviewed or shipped through a pull request.
 - Mention migrations, env changes, feature flags, data scripts, or manual setup.
 - If the branch is not ready, say what is missing instead of writing a polished
   PR body that implies completion.
+- A UI change needs before/after images. A diff does not show what the screen
+  looks like.
+
+## UI Screenshots
+
+`app/**` · `components/**` · `*.css`를 건드렸으면 **before/after 이미지를 본문에
+넣는다.** 화면 변화는 diff로 읽히지 않는다.
+
+- 로컬에서는 `playwright-cli`로 찍는다 (CLAUDE.md 「검증」). 개발 서버는 포트
+  3030이고, 띄우기 전에 이미 물려 있는지 확인한다.
+- **after를 찍고 base로 돌아가 before를 찍는다.** 서버를 겹쳐 띄우지 않는다.
+- 파일은 `docs/pr-shots/<브랜치>/`에 두고 커밋한다. 본문에는 **커밋 SHA로 고정한
+  raw URL**로 건다 — 브랜치 이름으로 걸면 머지 후 이미지가 깨진다.
+- **여러 상태를 바꿨으면 상태마다 한 쌍씩** 찍고, 무엇을 찍었는지 표 위에 한 줄 적는다.
+- **찍지 못했으면 찍은 척하지 않는다.** 왜 못 찍었는지 한 줄로 적는다.
+- **로그인이 필요한 화면은 로그아웃 상태까지만** 찍는다. 카카오 계정으로 대신
+  로그인하지 않는다.
 
 ## PR Body Format
+
+`## 화면`은 UI를 건드린 PR에만 넣는다.
 
 ```md
 ## Summary
 
 - ...
+
+## 화면
+
+| Before | After |
+|---|---|
+| <img src="https://raw.githubusercontent.com/OWNER/REPO/<SHA>/docs/pr-shots/.../before.png" width="420"> | <img src="...after.png" width="420"> |
 
 ## Verification
 

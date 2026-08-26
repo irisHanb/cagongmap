@@ -102,6 +102,16 @@ npm run verify     # lint → typecheck → test. 커밋 훅이 부르는 것도
   명사로 끝내지 않는다("로깅 추가" ✗).
 - 커밋 전에 pre-commit 훅이 `npm run verify`를 돌린다 (`docs/ci.md`).
 
+## PR
+
+- **UI를 바꿨으면 PR 본문에 before/after 이미지를 넣는다.** `app/**` · `components/**` ·
+  `*.css`를 건드린 PR이 대상이다. 화면 변화는 diff로 읽히지 않는다.
+  - 찍는 방법과 본문 형식은 `.claude/skills/pr/SKILL.md` 「UI Screenshots」에 있다.
+    에이전트가 CI에서 여는 PR은 `.github/workflows/agent-issue.yml`의 같은 절을 따른다.
+  - 파일은 `docs/pr-shots/<브랜치>/`에 두고 **커밋 SHA로 고정한 raw URL**로 건다.
+    브랜치 이름으로 걸면 머지 후 브랜치가 지워질 때 이미지가 깨진다.
+  - **찍지 못했으면 찍은 척하지 않는다.** 왜 못 찍었는지 한 줄로 적는다.
+
 ## 검증
 
 **`npm run verify`가 통과한 것과 화면이 도는 것은 다르다.** UI를 건드렸으면 실제로
