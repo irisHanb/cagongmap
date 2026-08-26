@@ -24,7 +24,7 @@
 ## 설계 원칙
 
 **`data/cafes.json`의 필드 이름을 그대로 컬럼 이름으로 쓴다.** 이미 snake_case라서
-`types/cafe.ts`의 `Cafe` 인터페이스가 그대로 row 모양이 된다. 덕분에 데이터 이음매
+`types/cafe.ts`의 `Cafe` 인터페이스가 그대로 row 모양이 된다. 덕분에 데이터 접근 계층
 (`lib/cafes.ts`)를 갈아끼울 때 매핑 코드가 필요 없다:
 
 ```ts

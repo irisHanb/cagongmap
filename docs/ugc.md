@@ -72,7 +72,7 @@ select public.approve_place_report('<제보id>', '<카페id>', '<큐레이터uui
 select public.approve_edit_request('<요청id>', '<큐레이터uuid>');
 ```
 
-## 이음매
+## 데이터 접근 계층
 
-`lib/reviews.ts`·`lib/submissions.ts`가 이음매이고 **둘 다 브라우저 전용이다.**
+`lib/reviews.ts`·`lib/submissions.ts`가 그 자리이고 **둘 다 브라우저 전용이다.**
 사진 규칙은 `docs/images.md`, 파일 판정은 `lib/photo-rules.ts`에 있다.
