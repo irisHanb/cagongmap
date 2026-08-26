@@ -56,7 +56,18 @@ effect 안에서 `setState`를 부르는 것(cascading render), 그리고 **렌�
 "렌더에서 만들고 정리해야 하는 값"(blob URL 같은)에서 둘 다 막히므로, 우회로를 찾기 전에
 `useMemo` + cleanup effect가 가능한지부터 본다 (`components/submission/PhotoPicker.tsx` 참고).
 
-## 비어 있는 자리
+## 비어 있는 자리는 없다 (2026-08-26)
 
-`DESIGN.md` Left Panel의 **4번 검색바만 비어 있다.** `docs/scope.md`가 검색·필터를 2차로
-미뤄둔 그대로다. **동작하지 않는 검색바를 먼저 띄우지 않는다.**
+`DESIGN.md` Left Panel 1-7번이 전부 구현됐다. **"4번 검색바만 비어 있다 — 동작하지 않는
+검색바를 먼저 띄우지 않는다"는 이날 해소됐다.**
+
+- 검색 입력칸은 **7번 카페 전체 목록 상자 안**, 제목과 목록 사이다. 별도 순서를
+  차지하지 않는다.
+- 필터 판정은 `lib/cafe-search.ts` 한 곳이고, `MapShell`이 걸러진 배열을 목록과 마커에
+  함께 넘긴다. 컴포넌트가 각자 거르지 않는다.
+- ⚠️ **이 화면의 입력칸에 `components/ui/input.tsx`를 쓰지 않는다.** 그것은 Tailwind
+  유틸리티라 `/admin` 밖에서는 스타일이 닿지 않아 브라우저 기본 입력칸이 렌더된다
+  (위 「Tailwind는 `/admin`에서만」). 같은 규격(48px·pill·흰 배경·`outline-variant`)이
+  `globals.css`의 `.field__input`에 있으므로 그것을 쓴다.
+
+**필터와 정렬은 그대로 2차다** (`docs/scope.md`). 검색이 생겼다고 딸려오지 않는다.

@@ -8,7 +8,7 @@ import BookmarkButton from '@/components/bookmark/BookmarkButton';
 import { HoursIcon, NoiseIcon, OutletIcon } from './QuickCheckIcons';
 
 /**
- * dock 하단의 카페 전체 목록 (DESIGN.md — Left Panel 8번).
+ * dock 하단의 카페 전체 목록 (DESIGN.md — Left Panel 7번).
  *
  * 북마크 패널과 달리 사진과 chip을 단다. 저장 목록은 "내가 고른 것을 다시 찾는" 자리라
  * 이름만으로 충분하지만, 이쪽은 아직 고르지 않은 카페를 고르는 자리라 판단에 쓰는 값이
@@ -20,6 +20,10 @@ import { HoursIcon, NoiseIcon, OutletIcon } from './QuickCheckIcons';
  * 영업 여부(isOpenNow)는 여기에 넣지 않는다. 시계를 읽는 값이라 서버 렌더와 클라이언트
  * 렌더가 갈리면 하이드레이션이 깨진다. 상세 패널은 클릭한 뒤에만 그려져서 안전하지만
  * 이 목록은 첫 화면에 함께 렌더된다.
+ *
+ * `cafes`는 이미 걸러진 배열이다 — 필터 판정은 `lib/cafe-search.ts` 한 곳에만 있고
+ * 여기서는 다시 거르지 않는다. 검색 상태(`query`)의 주인은 마커까지 함께 걸러야 하는
+ * `MapShell`이다.
  */
 /**
  * 카드에 다는 값 셋. 화면의 chip과 버튼의 aria-label이 같은 배열에서 나온다 —
@@ -35,9 +39,13 @@ function chipsOf(cafe: Cafe) {
 
 export default function CafeListPanel({
   cafes,
+  query,
+  onQueryChange,
   onSelect,
 }: {
   cafes: Cafe[];
+  query: string;
+  onQueryChange: (query: string) => void;
   onSelect: (cafe: Cafe) => void;
 }) {
   return (
@@ -48,59 +56,78 @@ export default function CafeListPanel({
         <span className="cafe-list-panel__count">{cafes.length}</span>
       </h2>
 
-      <ul className="dock-cafe-list">
-        {cafes.map((cafe) => {
-          const chips = chipsOf(cafe);
-          return (
-          <li key={cafe.id} className="dock-cafe">
-            {/* 카드 전체가 상세를 여는 버튼이다. 하트는 그 안이 아니라 형제로 둔다 —
-                button 안에 button을 넣을 수 없다.
+      {/* 규격은 DESIGN.md Search Bar(48px·pill·흰 배경·outline-variant 테두리)와 같지만
+          `components/ui/input.tsx`는 Tailwind 유틸리티라 이 화면에 닿지 않는다
+          (Tailwind는 `/admin`에서만 로드된다, .claude/rules/ui.md). 같은 규격을 이미
+          globals.css에 담아 둔 `.field__input`(공개 제보 폼이 쓰는 것과 동일)을 쓴다. */}
+      <input
+        type="search"
+        className="field__input cafe-list-panel__search"
+        placeholder="동네나 카페 이름"
+        aria-label="카페 검색"
+        value={query}
+        onChange={(event) => onQueryChange(event.target.value)}
+      />
 
-                aria-label을 직접 단다. 안 달면 span 넷이 띄어쓰기 없이 이어 붙어
-                "나루터서울 송파구 000콘센트 많음09:00 - 22:00조용함"으로 읽힌다. */}
-            <button
-              type="button"
-              className="dock-cafe__open"
-              onClick={() => onSelect(cafe)}
-              aria-label={[cafe.name, cafe.address, ...chips.map((chip) => chip.value)].join(', ')}
-            >
-              {cafe.photos.length > 0 ? (
-                <Image
-                  className="dock-cafe__photo"
-                  src={cafe.photos[0]}
-                  alt=""
-                  width={64}
-                  height={64}
-                  sizes="64px"
-                />
-              ) : (
-                // 사진이 없어도 자리를 비우지 않는다. 빠지면 카드마다 글이 다른 자리에서
-                // 시작한다.
-                <span className="dock-cafe__photo dock-cafe__photo--empty" aria-hidden="true" />
-              )}
+      {cafes.length === 0 ? (
+        <p className="cafe-list-panel__empty">검색 결과가 없어요</p>
+      ) : (
+        <ul className="dock-cafe-list">
+          {cafes.map((cafe) => {
+            const chips = chipsOf(cafe);
+            return (
+              <li key={cafe.id} className="dock-cafe">
+                {/* 카드 전체가 상세를 여는 버튼이다. 하트는 그 안이 아니라 형제로 둔다 —
+                    button 안에 button을 넣을 수 없다.
 
-              <span className="dock-cafe__body">
-                <span className="dock-cafe__name">{cafe.name}</span>
-                <span className="dock-cafe__address">{cafe.address}</span>
-              </span>
+                    aria-label을 직접 단다. 안 달면 span 넷이 띄어쓰기 없이 이어 붙어
+                    "나루터서울 송파구 000콘센트 많음09:00 - 22:00조용함"으로 읽힌다. */}
+                <button
+                  type="button"
+                  className="dock-cafe__open"
+                  onClick={() => onSelect(cafe)}
+                  aria-label={[cafe.name, cafe.address, ...chips.map((chip) => chip.value)].join(
+                    ', ',
+                  )}
+                >
+                  {cafe.photos.length > 0 ? (
+                    <Image
+                      className="dock-cafe__photo"
+                      src={cafe.photos[0]}
+                      alt=""
+                      width={64}
+                      height={64}
+                      sizes="64px"
+                    />
+                  ) : (
+                    // 사진이 없어도 자리를 비우지 않는다. 빠지면 카드마다 글이 다른 자리에서
+                    // 시작한다.
+                    <span className="dock-cafe__photo dock-cafe__photo--empty" aria-hidden="true" />
+                  )}
 
-              {/* 이름·주소 칸이 아니라 카드 전체 폭을 쓴다. 좁은 칸에 가두면 chip 셋이
-                  두 줄로 접힌다 (globals.css .dock-cafe__open) */}
-              <span className="dock-cafe__chips">
-                {chips.map((chip) => (
-                  <span key={chip.value} className="dock-chip">
-                    {chip.icon}
-                    {chip.value}
+                  <span className="dock-cafe__body">
+                    <span className="dock-cafe__name">{cafe.name}</span>
+                    <span className="dock-cafe__address">{cafe.address}</span>
                   </span>
-                ))}
-              </span>
-            </button>
 
-            <BookmarkButton cafe={cafe} />
-          </li>
-          );
-        })}
-      </ul>
+                  {/* 이름·주소 칸이 아니라 카드 전체 폭을 쓴다. 좁은 칸에 가두면 chip 셋이
+                      두 줄로 접힌다 (globals.css .dock-cafe__open) */}
+                  <span className="dock-cafe__chips">
+                    {chips.map((chip) => (
+                      <span key={chip.value} className="dock-chip">
+                        {chip.icon}
+                        {chip.value}
+                      </span>
+                    ))}
+                  </span>
+                </button>
+
+                <BookmarkButton cafe={cafe} />
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </section>
   );
 }
