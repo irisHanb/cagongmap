@@ -23,6 +23,11 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # agent-issue.yml이 연 PR은 Claude GitHub App(`claude`)이 주인이라
+          # 액션이 기본값으로 거부한다 — "Workflow initiated by non-human actor".
+          # 사람이 연 PR과 에이전트가 연 PR을 같은 기준으로 리뷰하려면 이 봇만 연다.
+          # `*`를 쓰지 않는다. 다른 봇이 연 PR까지 리뷰가 돌 이유가 없다.
+          allowed_bots: 'claude'
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
@@ -109,6 +114,11 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # agent-issue.yml이 연 PR은 Claude GitHub App(`claude`)이 주인이라
+          # 액션이 기본값으로 거부한다 — "Workflow initiated by non-human actor".
+          # 사람이 연 PR과 에이전트가 연 PR을 같은 기준으로 리뷰하려면 이 봇만 연다.
+          # `*`를 쓰지 않는다. 다른 봇이 연 PR까지 리뷰가 돌 이유가 없다.
+          allowed_bots: 'claude'
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}

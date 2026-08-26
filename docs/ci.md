@@ -39,6 +39,28 @@
   이 저장소 문서는 서술체("~한다")인데 그것을 그대로 가져오면 남의 코드를 반말로 지적하는
   코멘트가 된다. **판정은 단정하고 지시는 제안형**("~하는 편이 좋겠습니다")으로 쓴다.
 
+### ⚠️ 에이전트가 연 PR은 `allowed_bots` 없이는 리뷰가 시작도 못 한다
+
+`claude-code-action`은 **워크플로를 띄운 actor가 봇이면 기본값으로 거부한다.**
+
+```
+Action failed with error: Workflow initiated by non-human actor: claude (type: Bot).
+Add bot to allowed_bots list or use '*' to allow all bots.
+```
+
+`agent-issue.yml`이 연 PR은 주인이 Claude GitHub App(`app/claude`)이라 여기에 걸린다.
+2026-08-26에 PR #6이 이걸로 `review`·`security` 둘 다 실패했다. **`verify`는 통과했다** —
+코드 문제가 아니라 액션의 actor 검사다. 두 job의 `with:`에 한 줄씩 넣어 연다.
+
+```yaml
+allowed_bots: 'claude'
+```
+
+- **`*`를 쓰지 않는다.** 다른 봇이 연 PR까지 리뷰가 돌 이유가 없다.
+- 바로 위 절과 겹친다 — **이 줄을 넣고 재실행해도 merge ref가 갱신되기 전이면 옛 버전이
+  돈다.** PR 브랜치에 main을 머지하고 PR을 닫았다 다시 여는 것이 확실하다
+  (`reopened`가 트리거다).
+
 ### ⚠️ 워크플로를 고친 직후 바로 재실행하면 옛 버전이 돈다
 
 `pull_request` 워크플로는 head가 아니라 **merge ref**(`refs/pull/<N>/merge`)에서 읽히는데,
