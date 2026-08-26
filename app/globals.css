@@ -147,7 +147,11 @@ a {
   z-index: 2;
   width: 390px;
   max-width: calc(100vw - var(--sp-xl));
+  /* 목록이 붙은 뒤로는 dock이 화면보다 길어질 수 있다. 넘치면 잘려서 아래쪽
+     카드에 손이 닿지 않으므로 dock 자체가 스크롤한다 */
+  max-height: calc(100dvh - var(--sp-xl));
   padding: 20px;
+  overflow-y: auto;
   border-radius: var(--r-panel);
   background: color-mix(in srgb, var(--surface) 95%, transparent);
   backdrop-filter: blur(12px);
@@ -389,6 +393,166 @@ a {
   line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------
+   dock 카페 전체 목록 — DESIGN.md Left Panel 8번.
+   북마크 패널과 같은 상자 규격을 쓰되, 카드는 사진 + chip까지 싣는다
+   --------------------------------------------------------------- */
+
+.cafe-list-panel {
+  margin-top: var(--sp-md);
+  padding: var(--sp-md);
+  /* 북마크 패널과 같은 20px. 두 상자가 위아래로 붙으므로 규격이 갈리면 안 된다 */
+  border: 1px solid var(--outline-variant);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.cafe-list-panel__title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-sm);
+  margin-top: var(--sp-xs);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 28px;
+}
+
+.cafe-list-panel__count {
+  color: var(--on-surface-variant);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* 카페가 늘어도 dock이 화면을 넘지 않게 여기서 끊는다. 지도가 주 화면이라
+   목록이 지도를 밀어내면 안 된다 (DESIGN.md — Map Shell) */
+.dock-cafe-list {
+  display: flex;
+  max-height: min(420px, 45dvh);
+  flex-direction: column;
+  margin-top: var(--sp-sm);
+  gap: var(--sp-xs);
+  overflow-y: auto;
+  list-style: none;
+}
+
+.dock-cafe {
+  position: relative;
+}
+
+/* 하트를 뺀 카드 전체가 상세를 여는 버튼이다. 오른쪽 여백은 하트 자리.
+   chip을 사진 아래까지 늘리려고 flex 대신 grid로 짰다 — 이름·주소 칸(230px)에
+   가두면 chip 셋이 두 줄로 접힌다. */
+.dock-cafe__open {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 64px 1fr;
+  gap: var(--sp-sm);
+  padding: var(--sp-sm) 44px var(--sp-sm) var(--sp-sm);
+  border: none;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dock-cafe__open:hover {
+  background: var(--surface-container);
+}
+
+.dock-cafe__photo {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: var(--r-md);
+  background: var(--surface-container);
+  object-fit: cover;
+}
+
+.dock-cafe__photo--empty {
+  display: block;
+}
+
+.dock-cafe__body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-self: center;
+  gap: 2px;
+}
+
+.dock-cafe__name {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dock-cafe__address {
+  overflow: hidden;
+  color: var(--on-surface-variant);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dock-cafe__chips {
+  display: flex;
+  grid-column: 1 / -1;
+  gap: var(--sp-xs);
+  flex-wrap: wrap;
+}
+
+/* 값을 나르는 표식이지 상태 배지가 아니다. 색은 들지 않는다 —
+   색이 드는 것은 좋은 조건뿐이라는 규칙(DESIGN.md)이 여기에도 적용된다 */
+.dock-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-xs);
+  padding: 2px 8px;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--r-full);
+  background: var(--warm-cream);
+  color: var(--on-surface-variant);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.dock-chip svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+/* 좁은 화면에서는 dock이 가로를 다 덮으므로 목록을 더 짧게 끊는다.
+   844px 화면 기준 45dvh면 dock이 715px를 먹어 지도가 130px만 남는다 */
+@media (max-width: 559px) {
+  .dock-cafe-list {
+    max-height: 30dvh;
+  }
+}
+
+/* 하트는 카드 버튼의 형제다. 겹쳐 두되 클릭은 하트가 먼저 받는다 */
+.dock-cafe .bookmark-button {
+  position: absolute;
+  top: var(--sp-sm);
+  right: var(--sp-sm);
+  width: 32px;
+  height: 32px;
+}
+
+.dock-cafe .bookmark-button svg {
+  width: 16px;
+  height: 16px;
 }
 
 /* ---------------------------------------------------------------
